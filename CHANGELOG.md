@@ -1,5 +1,12 @@
 # Changelog
 
+## [v] - 2026-06-20
+
+### Added
+- Added Mermaid charts to README
+- Added legacy config migration and integration package installation to `install-all-organs.sh`
+
+
 ## [Unreleased]
 
 ## [0.5.0] - 2026-06-20
