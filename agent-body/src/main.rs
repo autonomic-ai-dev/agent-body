@@ -1,59 +1,65 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "autonomic", about = "Autonomic AI ecosystem manager")]
+#[command(name = "autonomic", about = "Autonomic AI ecosystem manager", version)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scaffold a new project and initialize required organs
+    /// Scaffold workspace and optional project directory
     Init {
-        /// Project name
         #[arg(short, long)]
         name: Option<String>,
     },
-    /// Start all required background daemons
+    /// Start background daemons (nerves, heart)
     Start,
-    /// Upgrade all ecosystem binaries to the latest compatible versions
+    /// Stop background daemons started by autonomic
+    Stop,
+    /// Show installed organ binary versions
     Update,
-    /// Verify daemon health and MCP connections
+    /// Verify organ binaries and workspace
     Doctor,
-    /// Show configuration and status
+    /// Show workspace paths and status
     Status,
+    /// Live CPU/RAM monitor for autonomic processes
+    Tui {
+        #[arg(long, default_value_t = 2)]
+        refresh: u64,
+    },
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if !args.is_empty() && !agent_body::router::is_builtin(&args[0]) {
+        return agent_body::router::exec_organ(&args);
+    }
+
+    let rt = tokio::runtime::Runtime::new()?;
     let cli = Cli::parse();
+
     match cli.command {
-        Commands::Init { name } => {
-            let project = name.unwrap_or_else(|| "my-ai-project".to_string());
-            println!("Scaffolding project '{}'...", project);
-            println!("  (not yet implemented)");
-        }
-        Commands::Start => {
-            println!("autonomic start (not yet implemented)");
-        }
-        Commands::Update => {
-            println!("autonomic update (not yet implemented)");
-        }
-        Commands::Doctor => {
-            let healthy = agent_body::doctor::check_all().await?;
+        Some(Commands::Init { name }) => agent_body::init::init_project(name.as_deref())?,
+        Some(Commands::Start) => agent_body::supervisor::start_all()?,
+        Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
+        Some(Commands::Update) => agent_body::update::show_versions()?,
+        Some(Commands::Doctor) => {
+            let healthy = rt.block_on(agent_body::doctor::check_all())?;
             if healthy {
-                println!("All systems healthy.");
+                println!("\nAll systems healthy.");
             } else {
-                println!("Some checks failed. Run `autonomic status` for details.");
+                println!("\nSome checks failed. Run `autonomic update` for version details.");
+                std::process::exit(1);
             }
         }
-        Commands::Status => {
-            let config = agent_body::config::Config::load()?;
+        Some(Commands::Status) => {
+            let _ = agent_body::config::Config::load()?;
             println!("autonomic status");
             println!("  config: {}", agent_body_core::config_path().display());
             println!(
@@ -62,8 +68,18 @@ async fn main() -> anyhow::Result<()> {
             );
             println!("  memory: {}", agent_body_core::memory_dir().display());
             println!("  broker: {}", agent_body_core::broker_dir().display());
-            let _ = config;
+            println!(
+                "  route organs: {}",
+                agent_body::router::organ_list()
+            );
+        }
+        Some(Commands::Tui { refresh }) => {
+            agent_body::tui::run_dashboard(refresh)?;
+        }
+        None => {
+            Cli::parse_from(["autonomic", "--help"]);
         }
     }
+
     Ok(())
 }
