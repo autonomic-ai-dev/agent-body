@@ -1,13 +1,24 @@
 # Changelog
 
-## [v] - 2026-06-20
+All notable changes to this project will be documented in this file.
 
-### Added
-- Added Mermaid charts to README
-- Added legacy config migration and integration package installation to `install-all-organs.sh`
-
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.1] - 2026-06-20
+
+### Added
+
+- Mermaid architecture charts in README (`7dacf7b`)
+- Legacy config migration in `install-all-organs.sh` — moves `~/.agent_brain`, `~/.agent_spine`, and peripheral organ dirs into `~/.autonomic/` (`8dd6fca`)
+- Integration package install — `@supervisor` and `@starter` via agent-brain after organ install (`8dd6fca`)
+
+### Changed
+
+- `install-all-organs.sh` uses `agent-brain install --all --global` for multi-editor MCP wiring (`d588635`)
+- Ecosystem README, full organ installer, and integration smoke test (`75c3bf8`)
 
 ## [0.5.0] - 2026-06-20
 
