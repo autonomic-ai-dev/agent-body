@@ -57,6 +57,46 @@ install_binary() {
   echo "    ok: ${INSTALL_DIR}/${binary}"
 }
 
+migrate_configs() {
+  echo "==> Migrating legacy configurations..."
+  local auto_dir="$HOME/.autonomic"
+  mkdir -p "$auto_dir/memory" "$auto_dir/logs/spine" "$auto_dir/state" "$auto_dir/legacy_configs"
+
+  if [[ -d "$HOME/.agent_brain/data" ]]; then
+    echo "    Migrating agent-brain data..."
+    cp -Rn "$HOME/.agent_brain/data/"* "$auto_dir/memory/" 2>/dev/null || true
+    mv "$HOME/.agent_brain/config.yaml" "$auto_dir/legacy_configs/brain_config.yaml" 2>/dev/null || true
+    mv "$HOME/.agent_brain" "$HOME/.agent_brain.bak" 2>/dev/null || true
+  fi
+
+  if [[ -d "$HOME/.agent_spine/executions" ]]; then
+    echo "    Migrating agent-spine executions..."
+    cp -Rn "$HOME/.agent_spine/executions" "$auto_dir/logs/spine/" 2>/dev/null || true
+    mv "$HOME/.agent_spine" "$HOME/.agent_spine.bak" 2>/dev/null || true
+  fi
+
+  for organ in heart nerves muscle immune eyes mouth; do
+    if [[ -d "$HOME/.agent_${organ}" ]]; then
+      echo "    Migrating agent-${organ} state..."
+      mkdir -p "$auto_dir/state/${organ}"
+      cp -Rn "$HOME/.agent_${organ}/"* "$auto_dir/state/${organ}/" 2>/dev/null || true
+      mv "$HOME/.agent_${organ}" "$HOME/.agent_${organ}.bak" 2>/dev/null || true
+    fi
+  done
+}
+
+install_integration_packages() {
+  echo "==> Installing integration packages..."
+  if [[ -x "${INSTALL_DIR}/agent-brain" ]]; then
+    echo "    Installing global MCP hooks and permissions..."
+    "${INSTALL_DIR}/agent-brain" install --global || true
+    echo "    Installing @supervisor package..."
+    "${INSTALL_DIR}/agent-brain" add @supervisor || true
+    echo "    Installing @starter package..."
+    "${INSTALL_DIR}/agent-brain" add @starter || true
+  fi
+}
+
 main() {
   local target
   target="$(detect_target)"
@@ -86,6 +126,9 @@ main() {
   echo "==> Initializing Autonomic workspace"
   export PATH="${INSTALL_DIR}:${PATH}"
   if "${INSTALL_DIR}/agent-body" init; then
+    migrate_configs
+    install_integration_packages
+    
     echo "==> Running autonomic doctor"
     "${INSTALL_DIR}/agent-body" doctor || true
   fi
