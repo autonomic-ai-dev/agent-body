@@ -1,6 +1,26 @@
 use anyhow::Result;
+use std::process::Command;
 
 use crate::router::{self, ORGANS};
+
+pub fn run_update() -> Result<()> {
+    println!("Updating all Autonomic organs from latest GitHub releases...");
+    
+    let mut child = Command::new("bash")
+        .arg("-c")
+        .arg("curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/main/scripts/install-all-organs.sh | bash")
+        .spawn()?;
+        
+    let status = child.wait()?;
+    
+    if status.success() {
+        println!("\nSuccessfully updated all organs.\n");
+    } else {
+        println!("\nUpdate failed.\n");
+    }
+    
+    show_versions()
+}
 
 pub fn show_versions() -> Result<()> {
     println!("Autonomic organ versions on PATH:\n");

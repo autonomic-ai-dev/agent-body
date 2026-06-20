@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
         Some(Commands::Restart) => agent_body::supervisor::restart_all()?,
         Some(Commands::Supervise { interval }) => agent_body::supervisor::supervise(interval)?,
-        Some(Commands::Update) => agent_body::update::show_versions()?,
+        Some(Commands::Update) => agent_body::update::run_update()?,
         Some(Commands::Doctor) => {
             let healthy = rt.block_on(agent_body::doctor::check_all())?;
             if healthy {
