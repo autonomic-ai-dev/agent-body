@@ -42,8 +42,9 @@ main() {
   install -d "$HOME/.local/bin"
   curl -fsSL "$url" -o "$HOME/.local/bin/agent-body"
   chmod +x "$HOME/.local/bin/agent-body"
+  ln -sf "$HOME/.local/bin/agent-body" "$HOME/.local/bin/autonomic"
 
-  echo "Installed agent-body $tag to $HOME/.local/bin/agent-body" >&2
+  echo "Installed agent-body $tag to $HOME/.local/bin/agent-body (autonomic symlink)" >&2
 }
 
 main "$@"

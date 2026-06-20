@@ -1,72 +1,85 @@
 # agent-body
 
-**The sovereign meta-framework and unified CLI installer for the Autonomic AI ecosystem.**
+**Meta-framework and unified CLI for the Autonomic AI ecosystem.**
 
-agent-body is the central nervous system wrapper. It provides the unified `autonomic` CLI tool to scaffold, manage, and install all underlying organs (`brain`, `spine`, `heart`, etc.) so developers never have to piece the ecosystem together manually.
-
-Rust is the body; the developer is the mind.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash -s -- --global
-autonomic init --full
-```
-
-**MCP is live immediately** — it exposes ecosystem-level health checks and orchestration tools to the agent.
+`agent-body` installs as the `agent-body` binary and exposes the **`autonomic`** CLI (symlinked on install). It scaffolds the shared workspace, supervises core daemons, routes commands to peripheral organs, and ships `agent-body-core` — the shared types and NATS schemas every organ uses.
 
 ---
 
-## Why agent-body?
+## Architecture
 
-The Autonomic AI ecosystem is intentionally decoupled into highly specialized daemons. While this Unix-philosophy approach provides unmatched scalability and resilience, it can be intimidating to set up from scratch.
+Each organ is **independently useful** (its own binary, config section, CLI, and HTTP API) and **designed to integrate** through shared paths, NATS JetStream, and the agent-spine event bus.
 
-1. **Fragmentation:** Asking a user to download and configure 7 different Rust binaries is a terrible onboarding experience.
-2. **Version Skew:** If `agent-spine` v2.1 requires `agent-nerves` v1.4, the user shouldn't have to manage that dependency graph.
-3. **Unified Telemetry:** Developers need a single command to check the health of the entire organism.
+```text
+                         autonomic (agent-body)
+                    init · start · doctor · <organ> …
+                                    │
+          ┌─────────────────────────┼─────────────────────────┐
+          │                         │                         │
+    agent-brain                 agent-spine               agent-heart
+    MCP / memory                workflows · events          GC scheduler
+          │                         │                         │
+          └─────────────┬───────────┴───────────┬─────────────┘
+                        │                       │
+                  agent-nerves              agent-muscle
+                  NATS / JetStream          exec · finetune
+                        │
+        ┌───────────────┼───────────────┬───────────────┐
+        │               │               │               │
+  agent-immune    agent-eyes      agent-mouth     (your agents)
+  scan / sandbox  vision / DOM    approvals
+```
 
-**agent-body fixes this with a unified meta-framework:**
-
-| Problem | agent-body answer |
-|---------|-------------------|
-| "This ecosystem is too complex to install" | **Unified Installer** — one bash script downloads `agent-body`, which then orchestrates the download and configuration of all other organs. |
-| "I don't know what versions are compatible" | **Version Pinning** — `autonomic update` manages compatibility matrices across all daemons. |
-| "Is the background daemon actually running?" | **Ecosystem Health** — `autonomic doctor` checks the status of the `heart`, `immune`, and `nerves` background processes. |
+| Integration surface | Purpose |
+|---------------------|---------|
+| `~/.autonomic/config.toml` | One file, `[organ]` sections per daemon |
+| `agent-body-core` | Shared NATS subjects, JetStream stream, workspace paths |
+| agent-spine `:3100` | Organ registration, heartbeats, domain events |
+| NATS (`agent-nerves`) | Async jobs: compute, train requests, bus messages |
 
 ---
 
-## Architectural Deep Dive
+## Quick start
 
-`agent-body` acts as a package manager and process supervisor for the Autonomic AI ecosystem.
-
-### 1. The `core` Crate
-While `agent-body` is a CLI tool, it also publishes the `autonomic-core` Rust crate.
-- This crate contains the shared types, `nats.rs` message schemas, and MCP tool definitions used by all other organs.
-- By centralizing these types, we guarantee that `agent-spine` can always talk to `agent-muscle` without schema mismatch errors.
-
-### 2. Process Supervision
-On macOS and Linux, `agent-body` configures `launchd` or `systemd` to ensure that critical background daemons (like `agent-heart`) restart automatically if they crash.
-
----
-
-## Complete Setup (Copy & Paste)
-
-### 1. Install the meta-framework
+### 1. Install all organs (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash -s -- --global
+curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install-all-organs.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### 2. Scaffold a new project
+This downloads release binaries for **agent-body** and all eight peripheral organs, links `autonomic` → `agent-body`, runs **`autonomic init`**, and verifies with **`autonomic doctor`**.
+
+Install only the meta CLI:
 
 ```bash
-autonomic init --name my-ai-project
-cd my-ai-project
-autonomic start
+curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash
+ln -sf ~/.local/bin/agent-body ~/.local/bin/autonomic   # optional symlink
 ```
 
-### 3. Verify Health
+### 2. Initialize workspace
 
 ```bash
-autonomic doctor
+autonomic init                  # creates ~/.autonomic/ and config.toml sections
+autonomic init --name my-app    # optional project directory
+```
+
+### 3. Verify and start core daemons
+
+```bash
+autonomic doctor                # all organ binaries on PATH?
+autonomic update                # print installed versions
+autonomic start                 # nerves + heart (ordered, health-checked)
+autonomic status                # workspace paths + supervisor state
+```
+
+### 4. Route to any organ
+
+```bash
+autonomic brain serve           # → agent-brain …
+autonomic spine serve           # → agent-spine …
+autonomic muscle train --backend auto
+autonomic eyes dom stats
 ```
 
 ---
@@ -75,19 +88,68 @@ autonomic doctor
 
 | Command | Description |
 |---------|-------------|
-| `autonomic init` | Scaffold a new project and initialize required organs |
-| `autonomic start` | Start all required background daemons |
-| `autonomic update` | Upgrade all ecosystem binaries to the latest compatible versions |
-| `autonomic doctor` | Verify MCP connections and daemon health |
+| `autonomic init [--name DIR]` | Create `~/.autonomic/` workspace and unified config |
+| `autonomic start` | Start supervised daemons (nerves, heart) |
+| `autonomic stop` / `restart` | Stop or restart supervised daemons |
+| `autonomic supervise` | Watch and restart unhealthy daemons |
+| `autonomic doctor` | Verify organ binaries and workspace |
+| `autonomic update` | List installed organ versions on PATH |
+| `autonomic status` | Workspace paths + supervisor table |
+| `autonomic tui` | Live CPU/RAM for autonomic processes |
+| `autonomic <organ> …` | Proxy to `agent-{organ}` (brain, spine, heart, …) |
+
+---
+
+## Integration smoke test
+
+From a local checkout:
+
+```bash
+bash scripts/smoke-integration.sh
+# optional: start daemons and probe HTTP health
+AUTONOMIC_SMOKE_HTTP=1 bash scripts/smoke-integration.sh
+```
+
+---
+
+## Workspace layout
+
+| Path | Purpose |
+|------|---------|
+| `~/.autonomic/config.toml` | Unified organ configuration |
+| `~/.autonomic/memory/` | agent-brain store |
+| `~/.autonomic/broker/` | NATS / JetStream persistence |
+| `~/.autonomic/logs/spine/` | Workflow and execution state |
+| `~/.autonomic/state/<organ>/` | Per-organ runtime state |
+
+---
+
+## Peripheral organs
+
+| Organ | Port | Role |
+|-------|------|------|
+| [agent-brain](../agent-brain) | MCP stdio | Context routing, memory, MCP |
+| [agent-spine](../agent-spine) | 3100 | YAML workflows, event bus |
+| [agent-heart](../agent-heart) | 3101 | Scheduled agent-brain GC |
+| [agent-nerves](../agent-nerves) | 3102 | NATS / JetStream bus |
+| [agent-muscle](../agent-muscle) | 3103 | Command execution, LoRA training |
+| [agent-mouth](../agent-mouth) | 3104 | Slack approvals, webhooks |
+| [agent-eyes](../agent-eyes) | 3105 | Capture, DOM index, VLM |
+| [agent-immune](../agent-immune) | 3106 | OSV scan, sandbox |
+
+Each repo includes its own `scripts/install.sh` if you prefer to install organs individually.
 
 ---
 
 ## Development
 
 ```bash
-cargo test --release -p agent-body
+cargo test --release -p agent-body -p agent-body-core
 cargo build --release -p agent-body
 ```
 
+---
+
 ## License
+
 MIT
