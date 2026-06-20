@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-20
+
+### Added
+
+- **`global_workspace` module** — canonical paths under `~/.autonomic/` (or `AUTONOMIC_HOME`): memory, spine logs, broker, per-organ state, unified `config.toml`
+- **`organ_config` loader** — reads each organ's settings from `[organ]` sections in unified TOML; auto-migrates legacy `~/.config/<organ>/config.yaml`
+
+### Changed
+
+- Version bumped from `0.1.0` to `0.2.0`
+
 ## [0.1.0] - 2026-06-20
 
 ### Added
