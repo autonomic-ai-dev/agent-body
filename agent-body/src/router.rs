@@ -17,6 +17,8 @@ pub const BUILTIN_COMMANDS: &[&str] = &[
     "init",
     "start",
     "stop",
+    "restart",
+    "supervise",
     "update",
     "doctor",
     "status",

@@ -18,11 +18,18 @@ enum Commands {
     Start,
     /// Stop background daemons started by autonomic
     Stop,
+    /// Restart all supervised daemons
+    Restart,
+    /// Watch daemons and restart unhealthy processes
+    Supervise {
+        #[arg(long, default_value_t = 5)]
+        interval: u64,
+    },
     /// Show installed organ binary versions
     Update,
     /// Verify organ binaries and workspace
     Doctor,
-    /// Show workspace paths and status
+    /// Show workspace paths and daemon supervisor status
     Status,
     /// Live CPU/RAM monitor for autonomic processes
     Tui {
@@ -48,6 +55,8 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Init { name }) => agent_body::init::init_project(name.as_deref())?,
         Some(Commands::Start) => agent_body::supervisor::start_all()?,
         Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
+        Some(Commands::Restart) => agent_body::supervisor::restart_all()?,
+        Some(Commands::Supervise { interval }) => agent_body::supervisor::supervise(interval)?,
         Some(Commands::Update) => agent_body::update::show_versions()?,
         Some(Commands::Doctor) => {
             let healthy = rt.block_on(agent_body::doctor::check_all())?;
@@ -72,6 +81,8 @@ fn main() -> anyhow::Result<()> {
                 "  route organs: {}",
                 agent_body::router::organ_list()
             );
+            println!();
+            agent_body::supervisor::print_status()?;
         }
         Some(Commands::Tui { refresh }) => {
             agent_body::tui::run_dashboard(refresh)?;

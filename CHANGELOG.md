@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-20
+
+### Added
+
+- **Daemon supervisor v1** — ordered start/stop, HTTP health probes, `autonomic restart`, `autonomic supervise`, `status.json`
+- **Supervisor status in `autonomic status`** — PID, running, healthy columns per organ
+
+### Changed
+
+- Version bumped from `0.4.0` to `0.5.0`
+
 ## [0.4.0] - 2026-06-20
 
 ### Added
