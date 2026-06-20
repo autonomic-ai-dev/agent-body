@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-20
+
+### Added
+
+- **NATS server install** in `install-all-organs.sh` — downloads platform-specific nats-server v2.10.16 binary
+- **NATS daemon** in supervisor — starts before nerves with JetStream and health probe on `:8222`
+
 ## [0.5.1] - 2026-06-20
 
 ### Added

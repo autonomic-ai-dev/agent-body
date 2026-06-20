@@ -57,6 +57,42 @@ install_binary() {
   echo "    ok: ${INSTALL_DIR}/${binary}"
 }
 
+install_nats() {
+  echo "==> Installing nats-server"
+  local os arch asset
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m)"
+  case "$os" in
+    darwin)
+      case "$arch" in
+        x86_64) asset="nats-server-v2.10.16-darwin-amd64" ;;
+        arm64|aarch64) asset="nats-server-v2.10.16-darwin-arm64" ;;
+        *) echo "unsupported arch: $arch" >&2; return 1 ;;
+      esac
+      ;;
+    linux)
+      case "$arch" in
+        x86_64) asset="nats-server-v2.10.16-linux-amd64" ;;
+        aarch64|arm64) asset="nats-server-v2.10.16-linux-arm64" ;;
+        *) echo "unsupported arch: $arch" >&2; return 1 ;;
+      esac
+      ;;
+    *) echo "unsupported OS: $os" >&2; return 1 ;;
+  esac
+
+  local url="https://github.com/nats-io/nats-server/releases/download/v2.10.16/${asset}.zip"
+  if ! curl -fsSL "$url" -o "/tmp/${asset}.zip"; then
+    echo "    failed to download: ${url}" >&2
+    return 1
+  fi
+
+  unzip -q -o "/tmp/${asset}.zip" -d "/tmp/nats_extract"
+  cp "/tmp/nats_extract/${asset}/nats-server" "${INSTALL_DIR}/nats-server"
+  chmod +x "${INSTALL_DIR}/nats-server"
+  rm -rf "/tmp/${asset}.zip" "/tmp/nats_extract"
+  echo "    ok: ${INSTALL_DIR}/nats-server"
+}
+
 migrate_configs() {
   echo "==> Migrating legacy configurations..."
   local auto_dir="$HOME/.autonomic"
@@ -114,6 +150,8 @@ main() {
     ln -sf "${INSTALL_DIR}/agent-body" "${INSTALL_DIR}/autonomic"
     echo "==> Linked autonomic -> agent-body"
   fi
+
+  install_nats || true
 
   echo
   if [[ "$failed" -gt 0 ]]; then

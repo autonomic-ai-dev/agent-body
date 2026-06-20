@@ -30,6 +30,13 @@ struct DaemonSpec {
 
 const DAEMONS: &[DaemonSpec] = &[
     DaemonSpec {
+        name: "nats",
+        binary: "nats-server",
+        args: &["-js", "-m", "8222"],
+        health_url: "http://127.0.0.1:8222/healthz",
+        start_order: 0,
+    },
+    DaemonSpec {
         name: "nerves",
         binary: "agent-nerves",
         args: &["serve"],
