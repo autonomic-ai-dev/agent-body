@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-20
+
+### Added
+
+- **`nats` module** — shared JetStream subjects and message types (`StateTransitionEvent`, `ComputeJob`, `SandboxExecute`, etc.)
+- **Dedup defaults** — `default_duplicate_window()` and `default_ack_wait()` for exactly-once publishing
+
+### Changed
+
+- Version bumped from `0.2.0` to `0.3.0`
+
 ## [0.2.0] - 2026-06-20
 
 ### Added
