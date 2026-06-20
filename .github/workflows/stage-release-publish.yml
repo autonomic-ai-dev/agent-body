@@ -1,0 +1,38 @@
+name: Stage release publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+      git_sha:
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build release binaries
+        run: |
+          cargo build --release -p agent-body
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp target/release/agent-body "dist/agent-body-linux-x86_64"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          files: dist/*
+          body_path: CHANGELOG.md
