@@ -16,7 +16,7 @@ pub use global_workspace::{
     legacy_config_path, memory_dir, memory_logs_dir, organ_state_dir, spine_logs_dir,
 };
 pub use nats::{
-    ComputeJob, ComputeResult, ExecuteResult, SandboxExecute, StateTransitionEvent,
-    STREAM_NAME, STREAM_SUBJECT_WILDCARD, default_ack_wait, default_duplicate_window,
+    ComputeJob, ComputeResult, ExecuteResult, STREAM_NAME, STREAM_SUBJECT_WILDCARD, SandboxExecute,
+    StateTransitionEvent, default_ack_wait, default_duplicate_window, default_nats_url,
 };
 pub use provenance::BrainProvenance;

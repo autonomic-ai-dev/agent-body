@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-20
+
+### Added
+
+- **`default_nats_url()`** — reads `AUTONOMIC_NATS_URL` for cross-organ NATS configuration
+
 ## [0.3.0] - 2026-06-20
 
 ### Added

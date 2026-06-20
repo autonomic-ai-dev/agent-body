@@ -55,22 +55,13 @@ async fn main() -> anyhow::Result<()> {
         Commands::Status => {
             let config = agent_body::config::Config::load()?;
             println!("autonomic status");
-            println!(
-                "  config: {}",
-                agent_body_core::config_path().display()
-            );
+            println!("  config: {}", agent_body_core::config_path().display());
             println!(
                 "  workspace: {}",
                 agent_body_core::autonomic_root().display()
             );
-            println!(
-                "  memory: {}",
-                agent_body_core::memory_dir().display()
-            );
-            println!(
-                "  broker: {}",
-                agent_body_core::broker_dir().display()
-            );
+            println!("  memory: {}", agent_body_core::memory_dir().display());
+            println!("  broker: {}", agent_body_core::broker_dir().display());
             let _ = config;
         }
     }

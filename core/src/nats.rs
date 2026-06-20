@@ -9,6 +9,11 @@ pub const STREAM_NAME: &str = "AUTONOMIC";
 /// Wildcard subject space owned by the AUTONOMIC stream.
 pub const STREAM_SUBJECT_WILDCARD: &str = "autonomic.>";
 
+/// Default NATS URL from the environment (`AUTONOMIC_NATS_URL`).
+pub fn default_nats_url() -> Option<String> {
+    std::env::var("AUTONOMIC_NATS_URL").ok()
+}
+
 /// Default duplicate-detection window (exactly-once publishing).
 pub fn default_duplicate_window() -> Duration {
     Duration::from_secs(120)
