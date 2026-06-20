@@ -10,24 +10,44 @@
 
 Each organ is **independently useful** (its own binary, config section, CLI, and HTTP API) and **designed to integrate** through shared paths, NATS JetStream, and the agent-spine event bus.
 
-```text
-                         autonomic (agent-body)
-                    init · start · doctor · <organ> …
-                                    │
-          ┌─────────────────────────┼─────────────────────────┐
-          │                         │                         │
-    agent-brain                 agent-spine               agent-heart
-    MCP / memory                workflows · events          GC scheduler
-          │                         │                         │
-          └─────────────┬───────────┴───────────┬─────────────┘
-                        │                       │
-                  agent-nerves              agent-muscle
-                  NATS / JetStream          exec · finetune
-                        │
-        ┌───────────────┼───────────────┬───────────────┐
-        │               │               │               │
-  agent-immune    agent-eyes      agent-mouth     (your agents)
-  scan / sandbox  vision / DOM    approvals
+```mermaid
+graph TD
+    body["autonomic (agent-body)<br>init · start · doctor"]
+
+    subgraph Core
+        brain["agent-brain<br>MCP / memory"]
+        spine["agent-spine<br>workflows · events"]
+        heart["agent-heart<br>GC scheduler"]
+    end
+
+    subgraph Messaging & Execution
+        nerves["agent-nerves<br>NATS / JetStream"]
+        muscle["agent-muscle<br>exec · finetune"]
+    end
+
+    subgraph Peripherals
+        immune["agent-immune<br>scan / sandbox"]
+        eyes["agent-eyes<br>vision / DOM"]
+        mouth["agent-mouth<br>approvals"]
+        custom["(your agents)"]
+    end
+
+    body --> brain
+    body --> spine
+    body --> heart
+    
+    brain --> nerves
+    spine --> nerves
+    heart --> nerves
+    
+    brain --> muscle
+    spine --> muscle
+    heart --> muscle
+    
+    nerves --> immune
+    nerves --> eyes
+    nerves --> mouth
+    nerves --> custom
 ```
 
 | Integration surface | Purpose |
