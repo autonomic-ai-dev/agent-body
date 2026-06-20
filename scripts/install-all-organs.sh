@@ -90,6 +90,10 @@ install_nats() {
   cp "/tmp/nats_extract/${asset}/nats-server" "${INSTALL_DIR}/nats-server"
   chmod +x "${INSTALL_DIR}/nats-server"
   rm -rf "/tmp/${asset}.zip" "/tmp/nats_extract"
+  if ! "${INSTALL_DIR}/nats-server" --version >/dev/null 2>&1; then
+    echo "    installed but failed version check" >&2
+    return 1
+  fi
   echo "    ok: ${INSTALL_DIR}/nats-server"
 }
 
@@ -152,6 +156,7 @@ main() {
   fi
 
   install_nats || true
+  mkdir -p "${HOME}/.autonomic/broker"
 
   echo
   if [[ "$failed" -gt 0 ]]; then
@@ -172,8 +177,12 @@ main() {
   fi
 
   echo
-  echo "Done. Optional next steps:"
-  echo "  autonomic start"
+  echo "Done. Start the local stack (NATS + core daemons):"
+  echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+  echo "  autonomic start          # nats-server (JetStream) → agent-nerves → agent-heart"
+  echo "  autonomic status         # supervisor PID / health table"
+  echo
+  echo "Optional:"
   echo "  bash scripts/smoke-integration.sh"
   echo "  AUTONOMIC_SMOKE_HTTP=1 bash scripts/smoke-integration.sh"
 }

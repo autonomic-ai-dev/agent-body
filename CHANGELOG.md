@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- README docs aligned with agent-brain template across peripheral organs; fixed GitHub links
+- `install-all-organs.sh` documents and verifies `nats-server`; creates broker dir; clarifies `autonomic start` order
+
 ## [0.5.2] - 2026-06-20
 
 ### Added
