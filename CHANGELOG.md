@@ -4,6 +4,12 @@
 
 ## [0.3.1] - 2026-06-20
 
+### Changed
+
+- Version bumped from `0.3.0` to `0.3.1` (includes core `default_nats_url()`)
+
+## [0.3.1] - 2026-06-20
+
 ### Added
 
 - **`default_nats_url()`** — reads `AUTONOMIC_NATS_URL` for cross-organ NATS configuration
