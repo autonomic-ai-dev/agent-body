@@ -88,8 +88,8 @@ migrate_configs() {
 install_integration_packages() {
   echo "==> Installing integration packages..."
   if [[ -x "${INSTALL_DIR}/agent-brain" ]]; then
-    echo "    Installing global MCP hooks and permissions..."
-    "${INSTALL_DIR}/agent-brain" install --global || true
+    echo "    Installing global MCP hooks and permissions for all editors..."
+    "${INSTALL_DIR}/agent-brain" install --all --global || true
     echo "    Installing @supervisor package..."
     "${INSTALL_DIR}/agent-brain" add @supervisor || true
     echo "    Installing @starter package..."
