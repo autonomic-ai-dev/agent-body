@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Extract the changelog entry for the latest version.
+# Extract a Keep a Changelog section for a release tag.
+# Usage: changelog-extract.sh v0.3.1 [CHANGELOG.md]
 set -euo pipefail
 
-CHANGELOG="${1:-CHANGELOG.md}"
+TAG="${1:?usage: changelog-extract.sh <tag> [file>]}"
+FILE="${2:-CHANGELOG.md}"
+VERSION="${TAG#v}"
 
-awk '
-  /^## \[/ { if (found) exit; found=1; next }
-  /^## \[/ { next }
-  found { print }
-' "$CHANGELOG"
+if [[ ! -f "$FILE" ]]; then
+  echo "Changelog file not found: $FILE" >&2
+  exit 1
+fi
+
+awk -v version="$VERSION" '
+  $0 ~ "^## \\[" version "\\]" { print; capture=1; next }
+  $0 ~ "^## \\[" && capture { exit }
+  capture { print }
+' "$FILE"

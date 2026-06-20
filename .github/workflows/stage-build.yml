@@ -4,40 +4,37 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        required: true
+        description: Crate version from the test stage
+        type: string
+        required: false
       git_sha:
-        required: true
+        description: Commit SHA from the test stage
+        type: string
+        required: false
 
 concurrency:
   group: stage-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build release binary
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      retention-days: 90
+
+  export:
+    name: Export build stage context
+    needs: build
+    if: success()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2.9.1
-
-      - name: Build release
-        run: cargo build --release -p agent-body
-
-      - name: Package binary
-        run: |
-          mkdir -p dist
-          cp target/release/agent-body "dist/agent-body-linux-x86_64-${{ inputs.version }}-${{ inputs.git_sha }}"
-          chmod +x "dist/agent-body-linux-x86_64-${{ inputs.version }}-${{ inputs.git_sha }}"
-
       - uses: aeswibon/pipeline-compose-export@v1.1.0
         with:
           stage_id: build
           outputs: >-
-            {"version":"${{ inputs.version }}",
+            {"run_id":"${{ github.run_id }}",
+             "version":"${{ inputs.version }}",
              "git_sha":"${{ inputs.git_sha }}"}

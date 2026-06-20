@@ -3,36 +3,58 @@ name: Stage release publish
 on:
   workflow_dispatch:
     inputs:
+      build_run_id:
+        description: Workflow run id from the build stage
+        type: string
+        required: true
       version:
-        required: true
+        description: Crate version from the build stage
+        type: string
+        required: false
       git_sha:
-        required: true
+        description: Commit SHA from the build stage
+        type: string
+        required: false
+
+concurrency:
+  group: stage-release-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  publish:
+  release:
     name: Publish release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build release binaries
-        run: |
-          cargo build --release -p agent-body
-
-      - name: Package binaries
-        run: |
-          mkdir -p dist
-          cp target/release/agent-body "dist/agent-body-linux-x86_64"
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
         with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+          merge-multiple: true
+
+      - name: Extract changelog release notes
+        shell: bash
+        run: |
+          chmod +x .github/scripts/changelog-extract.sh
+          .github/scripts/changelog-extract.sh "${{ github.ref_name }}" > release-notes.md
+          echo "--- Release notes ---"
+          cat release-notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: agent-body ${{ github.ref_name }}
+          body_path: release-notes.md
           files: dist/*
-          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false

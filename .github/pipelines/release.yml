@@ -1,33 +1,35 @@
-name: Release Pipeline
-on: [workflow_dispatch]
+version: 2
+companion_workflows:
+  - .github/workflows/ci.yml
+  - .github/workflows/release.yml
+  - .github/workflows/reusable-build.yml
+pipelines:
+  release:
+    stages:
+      - id: test
+        workflow: .github/workflows/stage-test.yml
+        outputs:
+          - version
+          - git_sha
+          - snapshot_run_id
 
-steps:
-  - name: Checkout
-    uses: actions/checkout@v6
+      - id: build
+        workflow: .github/workflows/stage-build.yml
+        needs:
+          - test
+        outputs:
+          - run_id
+          - version
+          - git_sha
+        inputs:
+          version: ${{ context.test.version }}
+          git_sha: ${{ context.test.git_sha }}
 
-  - name: Install Rust
-    uses: dtolnay/rust-toolchain@stable
-    with:
-      toolchain: stable
-      targets: x86_64-apple-darwin,aarch64-apple-darwin
-
-  - name: Cache
-    uses: Swatinem/rust-cache@v2
-
-  - name: Build (x86_64)
-    run: cargo build --release --target x86_64-apple-darwin -p agent-body
-
-  - name: Build (aarch64)
-    run: cargo build --release --target aarch64-apple-darwin -p agent-body
-
-  - name: Package
-    run: |
-      mkdir -p dist
-      cp target/x86_64-apple-darwin/release/agent-body dist/agent-body-x86_64-apple-darwin
-      cp target/aarch64-apple-darwin/release/agent-body dist/agent-body-aarch64-apple-darwin
-
-  - name: Create Release
-    uses: softprops/action-gh-release@v2
-    with:
-      files: dist/*
-      body_path: CHANGELOG.md
+      - id: release-publish
+        workflow: .github/workflows/stage-release-publish.yml
+        needs:
+          - build
+        inputs:
+          build_run_id: ${{ context.build.run_id }}
+          version: ${{ context.build.version }}
+          git_sha: ${{ context.build.git_sha }}
