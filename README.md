@@ -1,76 +1,97 @@
-# agent-body
+# agent-body — Autonomic AI Ecosystem Manager
 
-**Ecosystem manager and unified CLI — installs organs, scaffolds workspace, supervises NATS and core daemons.**
+**Unified CLI, daemon supervisor, and workspace scaffold for the Autonomic AI organ stack.**
 
-Part of the **[Autonomic AI](https://github.com/autonomic-ai-dev/agent-body)** stack. Installs as `agent-body` and exposes the **`autonomic`** command (symlinked on install). Routes to every peripheral organ, owns `~/.autonomic/`, and ships `agent-body-core` (shared NATS subjects and workspace types).
+`agent-body` is the entry point to the entire Autonomic ecosystem. It installs every organ binary, manages a shared `~/.autonomic/` workspace with unified configuration, supervises the NATS broker and core daemons, and exposes the **`autonomic`** command that routes to every peripheral.
 
-| Standalone | Integrated |
-|------------|------------|
-| `autonomic init` / `doctor` | All organs share `~/.autonomic/config.toml` |
-| `autonomic start` (NATS + nerves + heart) | agent-spine event bus on `:3100` |
-| `autonomic <organ> …` proxy | JetStream stream `AUTONOMIC` via agent-nerves |
+Without agent-body, you install and configure 8+ binaries separately. With it, you run `autonomic start` and every organ discovers each other through shared config, the spine event bus at `:3100`, and the NATS JetStream stream.
+
+---
+
+## Core Concept
+
+Autonomic AI is built as a **biological architecture** — specialized organs (brain, spine, heart, nerves, muscle, immune, eyes, mouth) that communicate through well-defined interfaces. agent-body is the **body**: it contains the meta-CLI, the daemon supervisor, and the workspace that makes all organs cohere.
+
+The key insight: **structure beats intelligence.** Instead of a monolithic agent that tries to do everything, each organ does one thing well. agent-body ensures they all speak the same config, share the same workspace, and start in the right order.
+
+```mermaid
+graph TD
+    body["autonomic (agent-body)<br>init · start · doctor · status"]
+
+    subgraph Core
+        brain["agent-brain<br>MCP router · memory · hooks"]
+        spine["agent-spine<br>workflows · event bus · state"]
+        heart["agent-heart<br>GC scheduler · budget gate"]
+    end
+
+    subgraph Messaging
+        nats["nats-server<br>JetStream :4222"]
+        nerves["agent-nerves<br>:3102 · NATS bridge"]
+    end
+
+    subgraph Peripherals
+        muscle["agent-muscle<br>execution · training"]
+        immune["agent-immune<br>security · sandbox"]
+        eyes["agent-eyes<br>observability · DOM"]
+        mouth["agent-mouth<br>approvals · webhooks"]
+    end
+
+    body --> brain & spine & heart
+    body --> nats
+    nats --> nerves --> muscle & immune
+    spine --> nerves
+    body --> eyes & mouth
+```
+
+---
+
+## Standalone vs Integrated
+
+| Mode | What you type | What happens |
+|------|--------------|--------------|
+| **Standalone** | `agent-body init` | Creates `~/.autonomic/` workspace and unified config |
+| **Standalone** | `agent-body doctor` | Checks all organ binaries on PATH |
+| **Standalone** | `autonomic brain serve` | Proxies to `agent-brain` with shared config |
+| **Integrated** | `autonomic start` | Ordered launch: NATS → nerves → heart, with health probes |
+| **Integrated** | `autonomic status` | PID table, health state, port assignments |
+| **Integrated** | `autonomic stop` | Graceful shutdown of supervised daemons |
+
+In standalone mode, organs are independent binaries with their own configs. In integrated mode, they share `~/.autonomic/config.toml`, register on the spine event bus, and communicate via NATS JetStream. agent-body manages the transition between both modes seamlessly.
 
 ---
 
 ## Why agent-body?
 
-Three problems hit every team wiring multiple agent tools together:
+Every team that wires multiple agent tools together hits the same three problems:
 
-1. **Fragmented install** — eight organ binaries, eight configs, no single “is this healthy?” command.
-2. **Broker bootstrap** — NATS/JetStream must run before nerves, muscle, and spine async paths work; easy to forget.
-3. **No supervisor** — daemons die silently; nothing restarts nerves or heart after a laptop sleep.
+1. **Fragmented install** — eight organ binaries, eight config paths, eight `--help` menus. No single "is this healthy?" command exists.
+2. **Broker bootstrap** — NATS with JetStream must run before nerves, muscle, and spine async paths work. Forgetting the broker means silent failures.
+3. **Daemon supervision** — organs die silently after laptop sleep or network partitions. Nothing restarts them automatically.
 
-**agent-body fixes this with one meta-CLI:**
+agent-body solves all three with a single meta-CLI:
 
 | Problem | agent-body answer |
 |---------|-------------------|
-| Scattered installs | **`install-all-organs.sh`** — all release binaries + `nats-server` + `autonomic init` |
-| Missing NATS | **`autonomic start`** — ordered supervisor: `nats-server -js` → `agent-nerves` → `agent-heart` |
-| Unknown system state | **`autonomic doctor`** / **`status`** — binary checks + PID/health table |
-| Per-organ CLIs | **`autonomic brain serve`** — proxies to `agent-{organ}` with shared config |
-
-Structure beats intelligence. Deterministic execution over probabilistic hallucination.
-
----
-
-## Quick Install
-
-Install every organ + NATS + workspace scaffold:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install-all-organs.sh | bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Meta CLI only:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash
-ln -sf ~/.local/bin/agent-body ~/.local/bin/autonomic
-```
-
-Verify and start the local stack:
-
-```bash
-autonomic doctor
-autonomic start          # nats-server (JetStream) → agent-nerves → agent-heart
-autonomic status
-export AUTONOMIC_NATS_URL=nats://localhost:4222   # if not already set
-```
+| Scattered installs | `install-all-organs.sh` installs all release binaries + `nats-server` + runs `autonomic init` |
+| Missing broker | `autonomic start` orders startup: `nats-server -js` → `agent-nerves` → `agent-heart` |
+| Unknown system state | `autonomic doctor` and `status` show binary health + PID table + port assignments |
+| Per-organ CLIs | `autonomic <organ> <args>` proxies to `agent-{organ}` with shared config |
+| Config duplication | One `~/.autonomic/config.toml` with `[brain]`, `[spine]`, `[heart]`, etc. sections |
 
 ---
 
-## Main features
+## What you get
 
-| Feature | Setup | Why use it |
-|---------|-------|------------|
-| **Full organ install** | `install-all-organs.sh` | One curl — all binaries, NATS, brain MCP hooks |
-| **Unified workspace** | `autonomic init` | Single `~/.autonomic/config.toml` for every organ |
-| **Daemon supervisor** | `autonomic start` | Ordered NATS + nerves + heart with health probes |
-| **Organ router** | `autonomic brain …` | Same flags as `agent-brain` without memorizing names |
-| **Legacy migration** | install script | Moves old `~/.agent_*` dirs into `~/.autonomic/` |
-| **Integration packages** | post-install | `@supervisor` + `@starter` via agent-brain |
-| **Health & versions** | `doctor`, `update` | Pre-flight before CI or local workflows |
+| Feature | Why use it |
+|---------|------------|
+| **Full organ install** | One `curl` — all binaries, NATS server, brain MCP hooks |
+| **Unified workspace** | `autonomic init` creates a single config to rule them all |
+| **Daemon supervisor** | Ordered NATS + nerves + heart with health probes and restart |
+| **Organ router** | `autonomic brain …` — same flags as `agent-brain` |
+| **Legacy migration** | Install script migrates old `~/.agent_*` dirs into `~/.autonomic/` |
+| **Integration packages** | Post-install adds `@supervisor` + `@starter` via agent-brain |
+| **Health dashboard** | `doctor`/`update` — pre-flight checks before CI or local workflows |
+| **Live TUI** | `autonomic tui` — CPU/RAM monitoring for all organ processes |
 
 ---
 
@@ -78,92 +99,79 @@ export AUTONOMIC_NATS_URL=nats://localhost:4222   # if not already set
 
 | Command | Description |
 |---------|-------------|
-| `autonomic init [--name DIR]` | Create `~/.autonomic/` workspace and unified config |
-| `autonomic start` | Start supervised daemons: **nats-server**, agent-nerves, agent-heart |
+| `autonomic init` | Create `~/.autonomic/` workspace and unified config |
+| `autonomic start` | Start supervised daemons: nats-server → nerves → heart |
 | `autonomic stop` / `restart` | Stop or restart supervised daemons |
 | `autonomic supervise` | Watch and restart unhealthy daemons |
-| `autonomic doctor` | Verify organ binaries and workspace |
+| `autonomic doctor` | Verify organ binaries and workspace health |
 | `autonomic update` | List installed organ versions on PATH |
 | `autonomic status` | Workspace paths + supervisor PID/health table |
-| `autonomic tui` | Live CPU/RAM for autonomic processes |
-| `autonomic <organ> …` | Proxy to `agent-{organ}` (brain, spine, heart, …) |
+| `autonomic tui` | Live CPU/RAM dashboard for autonomic processes |
+| `autonomic <organ> …` | Proxy any command to `agent-{organ}` |
 
 ---
 
-## Architecture
+## Quick Install
 
-```mermaid
-graph TD
-    body["autonomic (agent-body)<br>init · start · doctor"]
-
-    subgraph Core
-        brain["agent-brain<br>MCP / memory"]
-        spine["agent-spine<br>workflows · events"]
-        heart["agent-heart<br>GC scheduler"]
-    end
-
-    subgraph Messaging
-        nats["nats-server<br>JetStream"]
-        nerves["agent-nerves<br>:3102"]
-    end
-
-    subgraph Peripherals
-        muscle["agent-muscle"]
-        immune["agent-immune"]
-        eyes["agent-eyes"]
-        mouth["agent-mouth"]
-    end
-
-    body --> brain
-    body --> spine
-    body --> heart
-    body --> nats
-    nats --> nerves
-    nerves --> muscle
-    nerves --> immune
-    spine --> nerves
+```bash
+curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install-all-organs.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-| Integration surface | Purpose |
-|---------------------|---------|
-| `~/.autonomic/config.toml` | One file, `[organ]` sections per daemon |
-| `agent-body-core` | Shared NATS subjects, JetStream stream, workspace paths |
-| agent-spine `:3100` | Organ registration, heartbeats, domain events |
-| NATS (`agent-nerves`) | Async jobs: compute, train requests, bus messages |
+Meta CLI only (no organs):
+```bash
+curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash
+ln -sf ~/.local/bin/agent-body ~/.local/bin/autonomic
+```
+
+Verify:
+```bash
+autonomic doctor
+autonomic start
+autonomic status
+```
 
 ---
 
-## Peripheral organs
+## Integration Architecture
+
+The integration surface between organs is defined by three layers:
+
+| Layer | Protocol | Purpose |
+|--------|----------|---------|
+| **Config** | `~/.autonomic/config.toml` | One file with `[organ]` sections per daemon |
+| **Events** | agent-spine HTTP `:3100` | Organ registration, heartbeats, domain events |
+| **Async** | NATS JetStream via nerves | Compute jobs, train requests, bus messages |
+
+### Port assignments
 
 | Organ | Port | Role |
 |-------|------|------|
-| [agent-brain](https://github.com/autonomic-ai-dev/agent-brain) | MCP stdio | Context routing, memory, MCP |
-| [agent-spine](https://github.com/autonomic-ai-dev/agent-spine) | 3100 | YAML workflows, event bus |
-| [agent-heart](https://github.com/autonomic-ai-dev/agent-heart) | 3101 | Scheduled agent-brain GC |
-| [agent-nerves](https://github.com/autonomic-ai-dev/agent-nerves) | 3102 | NATS / JetStream bus |
-| [agent-muscle](https://github.com/autonomic-ai-dev/agent-muscle) | 3103 | Command execution, LoRA training |
-| [agent-mouth](https://github.com/autonomic-ai-dev/agent-mouth) | 3104 | Slack approvals, webhooks |
-| [agent-eyes](https://github.com/autonomic-ai-dev/agent-eyes) | 3105 | Capture, DOM index, VLM |
-| [agent-immune](https://github.com/autonomic-ai-dev/agent-immune) | 3106 | OSV scan, sandbox |
-
-Each repo includes its own `scripts/install.sh` if you prefer to install organs individually.
+| agent-brain | (MCP stdio) | Context routing, memory, MCP tools |
+| agent-spine | 3100 | YAML workflows, event bus, dashboard |
+| agent-heart | 3101 | Scheduled GC, token budget gate |
+| agent-nerves | 3102 | NATS/JetStream bridge + cluster |
+| agent-muscle | 3103 | Command execution, LoRA training |
+| agent-mouth | 3104 | Slack approvals, webhooks |
+| agent-eyes | 3105 | Capture, DOM index, VLM |
+| agent-immune | 3106 | OSV scan, sandbox |
 
 ---
 
-## Workspace layout
+## Workspace Layout
 
 | Path | Purpose |
 |------|---------|
 | `~/.autonomic/config.toml` | Unified organ configuration |
-| `~/.autonomic/memory/` | agent-brain store |
-| `~/.autonomic/broker/` | NATS / JetStream persistence |
-| `~/.autonomic/logs/spine/` | Workflow and execution state |
+| `~/.autonomic/memory/` | agent-brain knowledge store |
+| `~/.autonomic/broker/` | NATS/JetStream persistence |
+| `~/.autonomic/logs/spine/` | Workflow execution history |
 | `~/.autonomic/state/<organ>/` | Per-organ runtime state |
 | `~/.autonomic/state/supervisor/` | PID files and daemon logs |
 
 ---
 
-## Local setup
+## Development
 
 ```bash
 git clone https://github.com/autonomic-ai-dev/agent-body.git && cd agent-body
@@ -172,23 +180,9 @@ cargo build --release -p agent-body
 export PATH="$PWD/target/release:$PATH"
 autonomic start
 bash scripts/smoke-integration.sh
-AUTONOMIC_SMOKE_HTTP=1 bash scripts/smoke-integration.sh
 ```
 
 ---
-
-## Development
-
-```bash
-cargo test --release -p agent-body -p agent-body-core
-cargo build --release -p agent-body
-```
-
----
-
-## Releases
-
-See [CHANGELOG.md](CHANGELOG.md). Tags `v*` publish platform binaries with changelog-based release notes.
 
 ## License
 

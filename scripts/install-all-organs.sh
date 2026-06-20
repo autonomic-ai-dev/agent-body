@@ -41,6 +41,20 @@ detect_target() {
   esac
 }
 
+sign_macos_binary() {
+  local bin="$1"
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    return 0
+  fi
+  if ! command -v codesign >/dev/null 2>&1; then
+    echo "    warning: codesign not found — run 'xcode-select --install'" >&2
+    echo "    manaul fix: xattr -cr \"$bin\" && codesign --force --sign - \"$bin\"" >&2
+    return 0
+  fi
+  xattr -cr "$bin" 2>/dev/null || true
+  codesign --force --sign - "$bin" 2>/dev/null || true
+}
+
 install_binary() {
   local repo="$1"
   local binary="$2"
@@ -54,6 +68,7 @@ install_binary() {
     return 1
   fi
   chmod +x "${INSTALL_DIR}/${binary}"
+  sign_macos_binary "${INSTALL_DIR}/${binary}"
   echo "    ok: ${INSTALL_DIR}/${binary}"
 }
 

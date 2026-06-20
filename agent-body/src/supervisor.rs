@@ -37,18 +37,25 @@ const DAEMONS: &[DaemonSpec] = &[
         start_order: 0,
     },
     DaemonSpec {
+        name: "spine",
+        binary: "agent-spine",
+        args: &["serve"],
+        health_url: "http://127.0.0.1:3001/",
+        start_order: 1,
+    },
+    DaemonSpec {
         name: "nerves",
         binary: "agent-nerves",
         args: &["serve"],
         health_url: "http://127.0.0.1:3102/health",
-        start_order: 1,
+        start_order: 2,
     },
     DaemonSpec {
         name: "heart",
         binary: "agent-heart",
         args: &["serve"],
         health_url: "http://127.0.0.1:3101/health",
-        start_order: 2,
+        start_order: 3,
     },
 ];
 
