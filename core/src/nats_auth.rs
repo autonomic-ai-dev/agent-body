@@ -302,12 +302,13 @@ pub fn write_server_config(bundle: &NatsCredentialBundle) -> std::io::Result<Pat
 
     if !nats_insecure_mode() {
         writeln!(file, "authorization {{")?;
+        writeln!(file, "  users: [")?;
         for acl in bundle.organs.values() {
-            writeln!(file, "  {{")?;
-            writeln!(file, "    user: {:?}", acl.user)?;
-            writeln!(file, "    password: {:?}", acl.password)?;
-            writeln!(file, "    permissions: {{")?;
-            write!(file, "      publish: [")?;
+            writeln!(file, "    {{")?;
+            writeln!(file, "      user: {:?}", acl.user)?;
+            writeln!(file, "      password: {:?}", acl.password)?;
+            writeln!(file, "      permissions: {{")?;
+            write!(file, "        publish: [")?;
             for (i, s) in acl.publish.iter().enumerate() {
                 if i > 0 {
                     write!(file, ", ")?;
@@ -315,7 +316,7 @@ pub fn write_server_config(bundle: &NatsCredentialBundle) -> std::io::Result<Pat
                 write!(file, "{s:?}")?;
             }
             writeln!(file, "]")?;
-            write!(file, "      subscribe: [")?;
+            write!(file, "        subscribe: [")?;
             for (i, s) in acl.subscribe.iter().enumerate() {
                 if i > 0 {
                     write!(file, ", ")?;
@@ -323,9 +324,10 @@ pub fn write_server_config(bundle: &NatsCredentialBundle) -> std::io::Result<Pat
                 write!(file, "{s:?}")?;
             }
             writeln!(file, "]")?;
+            writeln!(file, "      }}")?;
             writeln!(file, "    }}")?;
-            writeln!(file, "  }}")?;
         }
+        writeln!(file, "  ]")?;
         writeln!(file, "}}")?;
     }
 

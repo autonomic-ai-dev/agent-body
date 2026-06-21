@@ -41,10 +41,13 @@ pub fn fetch_latest_tag(repo: &str) -> Result<String> {
     }
     let body = String::from_utf8_lossy(&output.stdout);
     for line in body.lines() {
-        if let Some(start) = line.find("\"tag_name\":\"") {
-            let start = start + 12;
-            if let Some(end) = line[start..].find('\"') {
-                return Ok(line[start..start + end].to_string());
+        if let Some(start) = line.find("\"tag_name\":") {
+            let rest = line[start + 11..].trim_start();
+            if rest.starts_with('"') {
+                let rest = &rest[1..];
+                if let Some(end) = rest.find('\"') {
+                    return Ok(rest[..end].to_string());
+                }
             }
         }
     }
