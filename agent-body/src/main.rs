@@ -108,14 +108,48 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Tui) => {
             let status = std::process::Command::new("agent-tui").status();
             if status.is_err() {
-                println!("agent-tui binary not found in PATH.");
-                println!("Please run `cargo install --path agent-tui` or download the latest release.");
+                println!("agent-tui binary not found. Installing from github...");
+                let install_status = std::process::Command::new("cargo")
+                    .args(["install", "--git", "https://github.com/autonomic-ai-dev/agent-tui.git"])
+                    .status();
+                if let Ok(s) = install_status {
+                    if s.success() {
+                        let _ = std::process::Command::new("agent-tui").status();
+                    } else {
+                        println!("Failed to install agent-tui.");
+                    }
+                }
             }
         }
         Some(Commands::Ui) => {
+            println!("Starting local WebSocket relay for the Web Dashboard...");
+            let ui_dir = agent_body_core::autonomic_root().join("agent-ui");
+            
+            if !ui_dir.exists() {
+                println!("agent-ui directory not found at {}. Cloning...", ui_dir.display());
+                let _ = std::process::Command::new("git")
+                    .args(["clone", "https://github.com/autonomic-ai-dev/agent-ui.git"])
+                    .current_dir(agent_body_core::autonomic_root())
+                    .status();
+                println!("Installing dependencies with Bun...");
+                let _ = std::process::Command::new("bun")
+                    .arg("install")
+                    .current_dir(&ui_dir)
+                    .status();
+            }
+
+            println!("Running bun server.js...");
+            let mut child = std::process::Command::new("bun")
+                .arg("server.js")
+                .current_dir(&ui_dir)
+                .spawn()
+                .expect("Failed to start bun server.js");
+
             println!("Opening Autonomic Web Dashboard...");
             let _ = std::process::Command::new("open").arg("https://ui.autonomic-ai.dev").status();
-            println!("Make sure your local WebSocket relay is running: `bun run server.js` inside agent-ui/");
+
+            println!("Press Ctrl+C to stop the local relay.");
+            let _ = child.wait();
         }
         Some(Commands::Log { name, follow, list }) => {
             if list {
