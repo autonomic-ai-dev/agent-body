@@ -8,6 +8,8 @@ use std::time::Duration;
 
 use agent_body_core::organ_state_dir;
 
+use crate::nats_config;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonStatus {
     pub name: String,
@@ -32,7 +34,7 @@ const DAEMONS: &[DaemonSpec] = &[
     DaemonSpec {
         name: "nats",
         binary: "nats-server",
-        args: &["-js", "-m", "8222"],
+        args: &[],
         health_url: "http://127.0.0.1:8222/healthz",
         start_order: 0,
     },
@@ -64,12 +66,26 @@ pub fn start_all() -> Result<()> {
     let supervisor_dir = supervisor_dir();
     fs::create_dir_all(&supervisor_dir)?;
 
+    let nats_bootstrap = match nats_config::ensure_nats_security() {
+        Ok(b) => {
+            println!(
+                "  ✓ NATS security configured ({})",
+                b.config_path.display()
+            );
+            Some(b)
+        }
+        Err(e) => {
+            eprintln!("  ! NATS security bootstrap failed: {e}");
+            None
+        }
+    };
+
     println!("Starting autonomic daemons (ordered)...");
     let mut specs: Vec<_> = DAEMONS.iter().collect();
     specs.sort_by_key(|s| s.start_order);
 
     for spec in specs {
-        match start_daemon(spec, &supervisor_dir) {
+        match start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
             Ok(pid) => {
                 println!("  ✓ {} (pid {pid})", spec.name);
                 if let Err(e) = wait_for_health(spec, 15) {
@@ -144,6 +160,7 @@ pub fn supervise(interval_secs: u64) -> Result<()> {
         "Supervising autonomic daemons every {}s (Ctrl+C to exit).",
         interval.as_secs()
     );
+    let nats_bootstrap = nats_config::ensure_nats_security().ok();
     loop {
         for spec in DAEMONS {
             let pid_path = supervisor_dir().join(format!("{}.pid", spec.name));
@@ -157,7 +174,7 @@ pub fn supervise(interval_secs: u64) -> Result<()> {
                 } else {
                     eprintln!("  ! {} not running — starting", spec.name);
                 }
-                match start_daemon(spec, &supervisor_dir()) {
+                match start_daemon(spec, &supervisor_dir(), nats_bootstrap.as_ref()) {
                     Ok(pid) => {
                         println!("  ✓ {} (pid {pid})", spec.name);
                         let _ = wait_for_health(spec, 15);
@@ -208,7 +225,11 @@ fn supervisor_dir() -> PathBuf {
     organ_state_dir("supervisor")
 }
 
-fn start_daemon(spec: &DaemonSpec, supervisor_dir: &Path) -> Result<u32> {
+fn start_daemon(
+    spec: &DaemonSpec,
+    supervisor_dir: &Path,
+    nats_bootstrap: Option<&nats_config::NatsBootstrap>,
+) -> Result<u32> {
     let pid_path = supervisor_dir.join(format!("{}.pid", spec.name));
     if let Some(existing) = read_running_pid(&pid_path)? {
         if check_health(spec.health_url) {
@@ -230,9 +251,39 @@ fn start_daemon(spec: &DaemonSpec, supervisor_dir: &Path) -> Result<u32> {
         .open(&log_path)
         .with_context(|| format!("open log {}", log_path.display()))?;
 
-    let child = Command::new(spec.binary)
-        .args(spec.args)
-        .env("RUST_LOG", "debug")
+    let mut cmd = Command::new(spec.binary);
+    if spec.name == "nats" {
+        if let Some(bootstrap) = nats_bootstrap {
+            cmd.arg("-c").arg(&bootstrap.config_path);
+        } else {
+            cmd.args(["-js", "-m", "8222", "-sd"])
+                .arg(agent_body_core::broker_dir());
+        }
+    } else {
+        cmd.args(spec.args);
+    }
+
+    cmd.env("RUST_LOG", "debug");
+    if let Some(bootstrap) = nats_bootstrap {
+        if spec.name != "nats" {
+            for (key, value) in agent_body_core::organ_env_vars(&bootstrap.bundle, spec.name) {
+                cmd.env(key, value);
+            }
+        }
+        if std::env::var("AUTONOMIC_NATS_URL").is_err() {
+            let scheme = if bootstrap.bundle.tls_enabled {
+                "tls"
+            } else {
+                "nats"
+            };
+            cmd.env(
+                "AUTONOMIC_NATS_URL",
+                format!("{}://127.0.0.1:{}", scheme, bootstrap.bundle.port),
+            );
+        }
+    }
+
+    let child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::from(log_file.try_clone()?))
         .stderr(Stdio::from(log_file))

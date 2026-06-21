@@ -30,6 +30,7 @@ pub mod subjects {
     pub const COMPUTE_RESULT: &str = "autonomic.compute.result";
     pub const EXECUTE_SANDBOX: &str = "autonomic.execute.sandbox";
     pub const EXECUTE_RESULT: &str = "autonomic.execute.result";
+    pub const SYSTEM_DLQ: &str = "system.dlq";
 }
 
 /// Workflow lifecycle event published by agent-spine.
@@ -72,6 +73,15 @@ pub struct SandboxExecute {
     pub command: String,
     #[serde(default)]
     pub cwd: Option<String>,
+    /// RAM limit in megabytes (default enforced by immune if unset).
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
+    /// CPU core limit (fractional allowed).
+    #[serde(default)]
+    pub cpu_cores: Option<f32>,
+    /// Sandbox backend: `subprocess`, `firecracker`, or `docker`.
+    #[serde(default)]
+    pub backend: Option<String>,
 }
 
 /// Sandbox execution result published for agent-spine orchestration.

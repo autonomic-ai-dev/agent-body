@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-06-21
+
+### Added
+
+- **V2 NATS security** — per-organ ACL credentials, secure `nats-server.conf` generation, optional mTLS (`AUTONOMIC_NATS_TLS=1`), and `agent-body-core` `connect_nats()` helper
+- Supervisor bootstraps broker credentials on `autonomic start` and injects `AUTONOMIC_NATS_*` env vars into spine, nerves, and heart
+
+### Changed
+
+- `agent-body-core` 0.3.3 — `nats_auth`, `nats_client` modules; `system.dlq` subject; extended `SandboxExecute` resource fields
+
 ## [0.5.6] - 2026-06-21
 
 ### Added
