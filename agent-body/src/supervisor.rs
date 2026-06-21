@@ -119,9 +119,10 @@ pub fn print_status() -> Result<()> {
     println!("autonomic supervisor");
     println!("  state: {}", supervisor_dir().display());
     println!();
+    let hdr_log = "LOG";
     println!(
         "{:<8} {:<6} {:<8} {:<8} {}",
-        "ORGAN", "PID", "RUNNING", "HEALTHY", "LOG"
+        "ORGAN", "PID", "RUNNING", "HEALTHY", hdr_log
     );
     println!("{}", "-".repeat(72));
     for s in &statuses {

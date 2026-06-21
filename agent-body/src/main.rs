@@ -25,8 +25,12 @@ enum Commands {
         #[arg(long, default_value_t = 5)]
         interval: u64,
     },
-    /// Show installed organ binary versions
-    Update,
+    /// Update all organs to latest GitHub releases
+    Update {
+        /// Force re-download even if already at latest
+        #[arg(short, long)]
+        force: bool,
+    },
     /// Verify organ binaries, workspace, and check logs for errors
     Doctor,
     /// Show workspace paths and daemon supervisor status
@@ -68,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
         Some(Commands::Restart) => agent_body::supervisor::restart_all()?,
         Some(Commands::Supervise { interval }) => agent_body::supervisor::supervise(interval)?,
-        Some(Commands::Update) => agent_body::update::run_update()?,
+        Some(Commands::Update { force }) => agent_body::update::run_update(force)?,
         Some(Commands::Doctor) => {
             let healthy = rt.block_on(agent_body::doctor::check_all())?;
             println!();

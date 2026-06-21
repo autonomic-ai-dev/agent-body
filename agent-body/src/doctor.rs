@@ -61,7 +61,7 @@ pub fn check_logs() -> Result<bool> {
     let mut all_clean = true;
     let mut entries: Vec<_> = fs::read_dir(&dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "log"))
         .collect();
     entries.sort_by_key(|e| e.file_name());
 
@@ -92,7 +92,7 @@ fn scan_log_for_errors(path: &PathBuf, max_lines: usize) -> Result<Vec<String>> 
 
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
-    let all_lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+    let all_lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
     let tail = all_lines.iter().rev().take(max_lines).rev();
 
     let mut found = Vec::new();

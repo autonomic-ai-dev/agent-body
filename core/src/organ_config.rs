@@ -14,10 +14,8 @@ where
     global_workspace::ensure_dirs().map_err(|e| anyhow::anyhow!(e))?;
     let unified = global_workspace::config_path();
 
-    if unified.exists() {
-        if let Some(cfg) = read_section(&unified, organ)? {
-            return Ok(cfg);
-        }
+    if unified.exists() && let Some(cfg) = read_section(&unified, organ)? {
+        return Ok(cfg);
     }
 
     let legacy = global_workspace::legacy_config_path(organ);

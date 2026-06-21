@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-06-21
+
+### Added
+
+- `autonomic update --force` now delegates to each organ's `update` subcommand instead of re-running the install script
+- Each organ (spine, nerves, heart, muscle, eyes, mouth, brain) now has its own `update [--force]` subcommand that checks GitHub releases, compares versions, and downloads a new binary if available
+
+### Fixed
+
+- Clippy: `map_or` → `is_some_and`, `filter_map(|l| l.ok())` → `map_while(Result::ok)` for CI compliance
+
 ## [0.5.5] - 2026-06-21
 
 ### Changed
