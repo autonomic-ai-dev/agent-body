@@ -230,6 +230,7 @@ fn start_daemon(spec: &DaemonSpec, supervisor_dir: &Path) -> Result<u32> {
 
     let child = Command::new(spec.binary)
         .args(spec.args)
+        .env("RUST_LOG", "debug")
         .stdin(Stdio::null())
         .stdout(Stdio::from(log_file.try_clone()?))
         .stderr(Stdio::from(log_file))
