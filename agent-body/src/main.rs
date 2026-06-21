@@ -27,10 +27,21 @@ enum Commands {
     },
     /// Show installed organ binary versions
     Update,
-    /// Verify organ binaries and workspace
+    /// Verify organ binaries, workspace, and check logs for errors
     Doctor,
     /// Show workspace paths and daemon supervisor status
     Status,
+    /// Display or follow daemon logs
+    Log {
+        /// Daemon name (e.g. spine, nerves, heart) or "all"
+        name: Option<String>,
+        /// Follow log output (tail -f)
+        #[arg(short, long)]
+        follow: bool,
+        /// List available log files
+        #[arg(short, long)]
+        list: bool,
+    },
     /// Live CPU/RAM monitor for autonomic processes
     Tui {
         #[arg(long, default_value_t = 2)]
@@ -60,7 +71,9 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Update) => agent_body::update::run_update()?,
         Some(Commands::Doctor) => {
             let healthy = rt.block_on(agent_body::doctor::check_all())?;
-            if healthy {
+            println!();
+            let logs_ok = agent_body::doctor::check_logs()?;
+            if healthy && logs_ok {
                 println!("\nAll systems healthy.");
             } else {
                 println!("\nSome checks failed. Run `autonomic update` for version details.");
@@ -86,6 +99,29 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Tui { refresh }) => {
             agent_body::tui::run_dashboard(refresh)?;
+        }
+        Some(Commands::Log { name, follow, list }) => {
+            if list {
+                let logs = agent_body::log::list_logs()?;
+                if logs.is_empty() {
+                    println!("No log files found in {}", agent_body_core::organ_state_dir("supervisor").join("logs").display());
+                } else {
+                    println!("Available logs:");
+                    for log in &logs {
+                        println!("  {log}");
+                    }
+                }
+                return Ok(());
+            }
+            let name = match name {
+                Some(n) => n,
+                None => anyhow::bail!("usage: autonomic log <name> [--follow]  (or --list to see available logs)"),
+            };
+            if follow {
+                agent_body::log::follow_log(&name)?;
+            } else {
+                agent_body::log::print_log(&name)?;
+            }
         }
         None => {
             Cli::parse_from(["autonomic", "--help"]);
