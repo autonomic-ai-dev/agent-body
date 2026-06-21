@@ -47,10 +47,14 @@ enum Commands {
         list: bool,
     },
     /// Live CPU/RAM monitor for autonomic processes
-    Tui {
+    Top {
         #[arg(long, default_value_t = 2)]
         refresh: u64,
     },
+    /// Launch the Autonomic Terminal Dashboard
+    Tui,
+    /// Launch the Autonomic Web Dashboard
+    Ui,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -98,8 +102,20 @@ fn main() -> anyhow::Result<()> {
             println!();
             agent_body::supervisor::print_status()?;
         }
-        Some(Commands::Tui { refresh }) => {
+        Some(Commands::Top { refresh }) => {
             agent_body::tui::run_dashboard(refresh)?;
+        }
+        Some(Commands::Tui) => {
+            let status = std::process::Command::new("agent-tui").status();
+            if status.is_err() {
+                println!("agent-tui binary not found in PATH.");
+                println!("Please run `cargo install --path agent-tui` or download the latest release.");
+            }
+        }
+        Some(Commands::Ui) => {
+            println!("Opening Autonomic Web Dashboard...");
+            let _ = std::process::Command::new("open").arg("https://ui.autonomic-ai.dev").status();
+            println!("Make sure your local WebSocket relay is running: `bun run server.js` inside agent-ui/");
         }
         Some(Commands::Log { name, follow, list }) => {
             if list {
