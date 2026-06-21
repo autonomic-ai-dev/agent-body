@@ -9,7 +9,10 @@ pub fn run_dashboard(refresh_secs: u64) -> Result<()> {
         print!("\x1b[2J\x1b[H");
         print_header();
         print_process_table();
-        print!("Press Ctrl+C to exit. Refreshing every {}s.", refresh.as_secs());
+        print!(
+            "Press Ctrl+C to exit. Refreshing every {}s.",
+            refresh.as_secs()
+        );
         io::stdout().flush()?;
         thread::sleep(refresh);
     }

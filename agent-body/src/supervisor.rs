@@ -128,9 +128,7 @@ pub fn print_status() -> Result<()> {
         println!(
             "{:<8} {:<6} {:<8} {:<8} {}",
             s.name,
-            s.pid
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "-".into()),
+            s.pid.map(|p| p.to_string()).unwrap_or_else(|| "-".into()),
             if s.running { "yes" } else { "no" },
             if s.healthy { "yes" } else { "no" },
             s.log_path
@@ -189,7 +187,10 @@ fn collect_status() -> Result<Vec<DaemonStatus>> {
             running,
             healthy,
             health_url: spec.health_url.to_string(),
-            log_path: log_dir.join(format!("{}.log", spec.name)).display().to_string(),
+            log_path: log_dir
+                .join(format!("{}.log", spec.name))
+                .display()
+                .to_string(),
         });
     }
     Ok(out)

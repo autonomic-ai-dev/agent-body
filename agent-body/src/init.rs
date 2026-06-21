@@ -26,7 +26,10 @@ pub fn init_project(name: Option<&str>) -> Result<()> {
     println!("  config:    {}", agent_body_core::config_path().display());
     println!("  memory:    {}", agent_body_core::memory_dir().display());
     println!("  broker:    {}", agent_body_core::broker_dir().display());
-    println!("  spine log: {}", agent_body_core::spine_logs_dir().display());
+    println!(
+        "  spine log: {}",
+        agent_body_core::spine_logs_dir().display()
+    );
     println!();
     println!("Next steps:");
     println!("  autonomic start          # broker + heart daemons");

@@ -43,7 +43,10 @@ pub fn resolve_binary(organ: &str) -> Option<&'static str> {
 
 pub fn exec_organ(args: &[String]) -> Result<()> {
     if args.is_empty() {
-        bail!("usage: autonomic <organ> [args...]  (organs: {})", organ_list());
+        bail!(
+            "usage: autonomic <organ> [args...]  (organs: {})",
+            organ_list()
+        );
     }
 
     let organ = &args[0];

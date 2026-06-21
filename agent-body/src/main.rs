@@ -90,10 +90,7 @@ fn main() -> anyhow::Result<()> {
             );
             println!("  memory: {}", agent_body_core::memory_dir().display());
             println!("  broker: {}", agent_body_core::broker_dir().display());
-            println!(
-                "  route organs: {}",
-                agent_body::router::organ_list()
-            );
+            println!("  route organs: {}", agent_body::router::organ_list());
             println!();
             agent_body::supervisor::print_status()?;
         }
@@ -104,7 +101,12 @@ fn main() -> anyhow::Result<()> {
             if list {
                 let logs = agent_body::log::list_logs()?;
                 if logs.is_empty() {
-                    println!("No log files found in {}", agent_body_core::organ_state_dir("supervisor").join("logs").display());
+                    println!(
+                        "No log files found in {}",
+                        agent_body_core::organ_state_dir("supervisor")
+                            .join("logs")
+                            .display()
+                    );
                 } else {
                     println!("Available logs:");
                     for log in &logs {
@@ -115,7 +117,9 @@ fn main() -> anyhow::Result<()> {
             }
             let name = match name {
                 Some(n) => n,
-                None => anyhow::bail!("usage: autonomic log <name> [--follow]  (or --list to see available logs)"),
+                None => anyhow::bail!(
+                    "usage: autonomic log <name> [--follow]  (or --list to see available logs)"
+                ),
             };
             if follow {
                 agent_body::log::follow_log(&name)?;
