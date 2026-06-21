@@ -108,15 +108,28 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Tui) => {
             let status = std::process::Command::new("agent-tui").status();
             if status.is_err() {
-                println!("agent-tui binary not found. Installing from github...");
-                let install_status = std::process::Command::new("cargo")
-                    .args(["install", "--git", "https://github.com/autonomic-ai-dev/agent-tui.git"])
+                println!("agent-tui binary not found. Downloading pre-compiled binary from GitHub...");
+                
+                let home_dir = std::env::var("HOME").unwrap_or_default();
+                let bin_path = format!("{}/.cargo/bin/agent-tui", home_dir);
+                
+                let install_status = std::process::Command::new("curl")
+                    .args([
+                        "-sL", 
+                        "https://raw.githubusercontent.com/autonomic-ai-dev/agent-tui/master/agent-tui", 
+                        "-o", 
+                        &bin_path
+                    ])
                     .status();
+                    
                 if let Ok(s) = install_status {
                     if s.success() {
+                        let _ = std::process::Command::new("chmod")
+                            .args(["+x", &bin_path])
+                            .status();
                         let _ = std::process::Command::new("agent-tui").status();
                     } else {
-                        println!("Failed to install agent-tui.");
+                        println!("Failed to download agent-tui.");
                     }
                 }
             }
