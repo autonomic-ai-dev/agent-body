@@ -22,6 +22,7 @@ pub const BUILTIN_COMMANDS: &[&str] = &[
     "update",
     "doctor",
     "status",
+    "log",
     "tui",
     "help",
     "--help",
