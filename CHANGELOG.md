@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2026-06-21
+
+### Added
+
+- `autonomic tui --force` and `autonomic ui --force` refresh dashboard installs
+- `autonomic ui --open-only` opens the hosted dashboard without starting the local relay
+- `autonomic update` also refreshes agent-tui (GitHub release) and agent-ui relay (git pull + bun install)
+
+### Fixed
+
+- `autonomic ui` opens the hosted dashboard at `https://ui-autonomic-ai.vercel.app` instead of the old domain
+- `autonomic tui` checks GitHub release version and upgrades when a newer tag is published
+- `autonomic ui` validates git/bun availability, checks clone/install exit codes, and supports Linux browser launch via `xdg-open`
+
 ## [0.5.8] - 2026-06-21
 
 ### Added

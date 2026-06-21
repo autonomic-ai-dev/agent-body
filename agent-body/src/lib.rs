@@ -6,5 +6,7 @@ pub mod nats_config;
 pub mod router;
 pub mod supervisor;
 pub mod tui;
+pub mod github_release;
 pub mod tui_install;
+pub mod ui_relay;
 pub mod update;

@@ -47,7 +47,27 @@ pub fn run_update(force: bool) -> Result<()> {
         println!("Some updates failed. You can retry with `autonomic update --force`.");
     }
 
+    update_dashboards(force)?;
+
     show_versions()
+}
+
+fn update_dashboards(force: bool) -> Result<()> {
+    println!("\nOptional dashboards:");
+
+    match crate::tui_install::update(force) {
+        Ok(true) => println!("  agent-tui  updated"),
+        Ok(false) => println!("  agent-tui  already up to date"),
+        Err(err) => println!("  agent-tui  update failed: {err:#}"),
+    }
+
+    match crate::ui_relay::update(force) {
+        Ok(true) => println!("  agent-ui   relay updated"),
+        Ok(false) => println!("  agent-ui   relay already up to date"),
+        Err(err) => println!("  agent-ui   relay update failed: {err:#}"),
+    }
+
+    Ok(())
 }
 
 pub fn show_versions() -> Result<()> {

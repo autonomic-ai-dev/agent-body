@@ -52,9 +52,20 @@ enum Commands {
         refresh: u64,
     },
     /// Launch the Autonomic Terminal Dashboard
-    Tui,
+    Tui {
+        /// Re-download agent-tui even if already installed
+        #[arg(short, long)]
+        force: bool,
+    },
     /// Launch the Autonomic Web Dashboard
-    Ui,
+    Ui {
+        /// Open the hosted dashboard without starting the local NATS relay
+        #[arg(long)]
+        open_only: bool,
+        /// Pull the latest agent-ui relay and reinstall dependencies
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -105,37 +116,8 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Top { refresh }) => {
             agent_body::tui::run_dashboard(refresh)?;
         }
-        Some(Commands::Tui) => agent_body::tui_install::run()?,
-        Some(Commands::Ui) => {
-            println!("Starting local WebSocket relay for the Web Dashboard...");
-            let ui_dir = agent_body_core::autonomic_root().join("agent-ui");
-            
-            if !ui_dir.exists() {
-                println!("agent-ui directory not found at {}. Cloning...", ui_dir.display());
-                let _ = std::process::Command::new("git")
-                    .args(["clone", "https://github.com/autonomic-ai-dev/agent-ui.git"])
-                    .current_dir(agent_body_core::autonomic_root())
-                    .status();
-                println!("Installing dependencies with Bun...");
-                let _ = std::process::Command::new("bun")
-                    .arg("install")
-                    .current_dir(&ui_dir)
-                    .status();
-            }
-
-            println!("Running bun server.js...");
-            let mut child = std::process::Command::new("bun")
-                .arg("server.js")
-                .current_dir(&ui_dir)
-                .spawn()
-                .expect("Failed to start bun server.js");
-
-            println!("Opening Autonomic Web Dashboard...");
-            let _ = std::process::Command::new("open").arg("https://ui.autonomic-ai.dev").status();
-
-            println!("Press Ctrl+C to stop the local relay.");
-            let _ = child.wait();
-        }
+        Some(Commands::Tui { force }) => agent_body::tui_install::run(force)?,
+        Some(Commands::Ui { open_only, force }) => agent_body::ui_relay::run(open_only, force)?,
         Some(Commands::Log { name, follow, list }) => {
             if list {
                 let logs = agent_body::log::list_logs()?;
