@@ -89,6 +89,35 @@ pub fn organ_version(organ: &str) -> Result<Option<String>> {
     }
 }
 
+/// Async version check with per-binary timeout.
+/// Returns (organ_alias, Option<version_string>).
+pub async fn organ_version_async(organ: &str) -> (String, Option<String>) {
+    let alias = organ.to_string();
+    let Some(binary) = resolve_binary(organ) else {
+        return (alias, None);
+    };
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        tokio::process::Command::new(binary)
+            .arg("--version")
+            .output(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(out)) if out.status.success() => {
+            let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let version = if text.is_empty() {
+                String::from_utf8_lossy(&out.stderr).trim().to_string()
+            } else {
+                text
+            };
+            (alias, Some(version))
+        }
+        _ => (alias, None),
+    }
+}
+
 pub fn organ_list() -> String {
     ORGANS
         .iter()

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.11] - 2026-06-21
+
+### Changed
+
+- **Parallel version checks** — `autonomic update` and `autonomic status` now run all 8 organ `--version` subprocesses concurrently via `tokio::task::JoinSet` with a 3s per-binary timeout, reducing total latency from ~6s to ~0.3s
+
 ## [0.5.10] - 2026-06-21
 
 ### Fixed

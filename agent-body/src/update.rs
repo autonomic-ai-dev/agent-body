@@ -71,13 +71,34 @@ fn update_dashboards(force: bool) -> Result<()> {
 }
 
 pub fn show_versions() -> Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(show_versions_async())
+}
+
+async fn show_versions_async() -> Result<()> {
     println!("Autonomic organ versions on PATH:\n");
     println!("{:<10} {:<16} status", "organ", "binary");
     println!("{}", "-".repeat(42));
 
-    for (alias, binary) in ORGANS {
-        match router::organ_version(alias)? {
-            Some(version) => println!("{alias:<10} {binary:<16} {version}"),
+    let mut join_set = tokio::task::JoinSet::new();
+    for (alias, _) in ORGANS {
+        let a = alias.to_string();
+        join_set.spawn(async move { router::organ_version_async(&a).await });
+    }
+
+    let mut results = Vec::new();
+    while let Some(result) = join_set.join_next().await {
+        match result {
+            Ok((alias, version)) => results.push((alias, version)),
+            Err(e) => tracing::warn!("version check failed: {e}"),
+        }
+    }
+    results.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (alias, version) in &results {
+        let binary = router::resolve_binary(alias).unwrap_or(alias);
+        match version {
+            Some(v) => println!("{alias:<10} {binary:<16} {v}"),
             None => println!("{alias:<10} {binary:<16} not installed"),
         }
     }
