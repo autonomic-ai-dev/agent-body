@@ -3,6 +3,9 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/github.sh
+source "${SCRIPT_DIR}/lib/github.sh"
 REPOS=(
   "autonomic-ai-dev/agent-body:agent-body"
   "autonomic-ai-dev/agent-brain:agent-brain"
@@ -62,18 +65,29 @@ install_binary() {
   local asset="${binary}-${target}"
   local url="https://github.com/${repo}/releases/latest/download/${asset}"
 
-  echo "==> Installing ${binary} (${target})"
+  if [[ "${VERBOSE:-0}" == "1" ]]; then
+    echo "==> Installing ${binary} (${target})"
+  fi
   if ! curl -fsSL "$url" -o "${INSTALL_DIR}/${binary}"; then
     echo "    failed: ${url}" >&2
     return 1
   fi
   chmod +x "${INSTALL_DIR}/${binary}"
   sign_macos_binary "${INSTALL_DIR}/${binary}"
-  echo "    ok: ${INSTALL_DIR}/${binary}"
+  if [[ "${VERBOSE:-0}" == "1" ]]; then
+    echo "    ok: ${INSTALL_DIR}/${binary}"
+  fi
 }
 
 install_nats() {
-  echo "==> Installing nats-server"
+  if [[ "${FORCE_NATS:-0}" != "1" ]] && command -v nats-server >/dev/null 2>&1; then
+    if nats-server --version >/dev/null 2>&1; then
+      echo "==> nats-server already installed ($(nats-server --version 2>&1 | head -1))"
+      return 0
+    fi
+  fi
+
+  echo "==> Installing nats-server (optional)"
   local os arch asset
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
   arch="$(uname -m)"
@@ -104,12 +118,21 @@ install_nats() {
   unzip -q -o "/tmp/${asset}.zip" -d "/tmp/nats_extract"
   cp "/tmp/nats_extract/${asset}/nats-server" "${INSTALL_DIR}/nats-server"
   chmod +x "${INSTALL_DIR}/nats-server"
+  sign_macos_binary "${INSTALL_DIR}/nats-server"
   rm -rf "/tmp/${asset}.zip" "/tmp/nats_extract"
-  if ! "${INSTALL_DIR}/nats-server" --version >/dev/null 2>&1; then
-    echo "    installed but failed version check" >&2
-    return 1
+  local ver_out ver_err
+  ver_out="$("${INSTALL_DIR}/nats-server" --version 2>&1)" || ver_err="$?"
+  if [[ -z "${ver_err:-}" ]]; then
+    echo "    ok: ${INSTALL_DIR}/nats-server ($ver_out)"
+    return 0
   fi
-  echo "    ok: ${INSTALL_DIR}/nats-server"
+  echo "    ⚠ optional nats-server: installed but version check failed" >&2
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo "    macOS fix: xattr -cr \"${INSTALL_DIR}/nats-server\" && codesign --force --sign - \"${INSTALL_DIR}/nats-server\"" >&2
+    echo "    or: brew install nats-server" >&2
+  fi
+  echo "    detail: ${ver_out:-unknown error}" >&2
+  return 1
 }
 
 migrate_configs() {
@@ -157,10 +180,14 @@ main() {
   target="$(detect_target)"
   mkdir -p "$INSTALL_DIR"
 
-  local failed=0
+  local failed=0 nats_warn=0
+  echo "[+] Installing organ binaries to ${INSTALL_DIR}"
   for entry in "${REPOS[@]}"; do
     IFS=: read -r repo binary <<<"$entry"
-    if ! install_binary "$repo" "$binary" "$target"; then
+    if install_binary "$repo" "$binary" "$target"; then
+      echo " => ${binary} DONE"
+    else
+      echo " => ${binary} ERROR" >&2
       failed=$((failed + 1))
     fi
   done
@@ -170,27 +197,38 @@ main() {
     echo "==> Linked autonomic -> agent-body"
   fi
 
-  install_nats || true
+  install_nats || nats_warn=1
   mkdir -p "${HOME}/.autonomic/broker"
 
   echo
   if [[ "$failed" -gt 0 ]]; then
-    echo "Installed with ${failed} failure(s). Missing releases may need a local \`cargo build --release\`." >&2
+    echo "Installed with ${failed} organ failure(s). Missing releases may need a local \`cargo build --release\`." >&2
     exit 1
   fi
 
   echo "All organ binaries installed to ${INSTALL_DIR}"
+  if [[ "$nats_warn" -gt 0 ]]; then
+    echo "Note: nats-server is optional — stack can use Homebrew \`brew install nats-server\` or fix codesign above."
+  fi
   echo
   echo "==> Initializing Autonomic workspace"
   export PATH="${INSTALL_DIR}:${PATH}"
   if "${INSTALL_DIR}/agent-body" init; then
     migrate_configs
     install_integration_packages
-    
-    echo "==> Running autonomic doctor"
-    "${INSTALL_DIR}/agent-body" doctor || true
+
+    echo "==> Running autonomic doctor --quick"
+    "${INSTALL_DIR}/agent-body" doctor --quick || true
   fi
 
+  echo
+  echo "Install summary:"
+  echo "  organs: ok (${#REPOS[@]}/${#REPOS[@]})"
+  if [[ "$nats_warn" -gt 0 ]]; then
+    echo "  nats:   optional warning (non-fatal)"
+  else
+    echo "  nats:   ok"
+  fi
   echo
   echo "Done. Start the local stack (NATS + core daemons):"
   echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
