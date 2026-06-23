@@ -1,20 +1,51 @@
 # Canonical integrated config for the Autonomic AI stack.
-# Copy to ~/.autonomic/config.toml and edit per organ.
+# Copy to ~/.autonomic/config.toml — same file in standalone and integrated mode.
 #
-# Standalone mode: each organ may also read a legacy local config path
-# (see each organ README). Integrated mode uses this file only.
+# Per-organ sections: [brain], [spine], [heart], [nerves], [muscle], [immune], [eyes], [mouth]
 
 [logging]
 level = "info"
 
+# --- Global agent mode (AGENTS.md composition) ---
+[agents]
+mode = "agent-brain"
+compose_agents_md = true
+
+# --- Whole-workspace git sync (~/.autonomic) ---
+[sync]
+enabled = false
+git.remote = ""
+git.branch = "main"
+git.auto_push = false
+
+# Optional per-organ sync overrides:
+# [sync.brain]
+# enabled = true
+
+# --- Self-update policy (global + per-organ overrides) ---
+[update]
+enabled = true
+auto = false
+interval_hours = 24
+
+[update.brain]
+auto = true
+
 # --- agent-brain (MCP router, memory, hooks) ---
-# Full options: agent-brain/config.example.yaml (YAML for brain-local dev)
-[brain]
-# data_dir defaults to ~/.autonomic/memory
+# Migrated from ~/.agent_brain/config.yaml when present.
+[brain.auto_update]
+enabled = true
+interval_hours = 24
+
+[brain.sync.git]
+remote = ""
+branch = "main"
+auto_push = false
 
 # --- agent-spine (workflows, event bus) ---
 [spine]
 # listen = "127.0.0.1:3100"
+# workflows_dir defaults to ~/.autonomic/state/spine/workflows
 
 # --- agent-heart (scheduled GC, budget gate) ---
 [heart.schedule]

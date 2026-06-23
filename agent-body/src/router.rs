@@ -20,6 +20,8 @@ pub const BUILTIN_COMMANDS: &[&str] = &[
     "restart",
     "supervise",
     "update",
+    "sync",
+    "agents",
     "doctor",
     "status",
     "log",

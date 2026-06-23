@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod config;
 pub mod doctor;
 pub mod init;
@@ -5,6 +6,7 @@ pub mod log;
 pub mod nats_config;
 pub mod router;
 pub mod supervisor;
+pub mod sync_cmd;
 pub mod tui;
 pub mod github_release;
 pub mod tui_install;

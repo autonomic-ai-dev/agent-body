@@ -7,12 +7,27 @@ use agent_body_core::ui::ProgressRun;
 use crate::config::Config;
 
 pub fn init_project(name: Option<&str>) -> Result<()> {
-    let total = if name.is_some() { 3 } else { 2 };
+    let total = if name.is_some() { 5 } else { 4 };
     let mut progress = ProgressRun::new("Initializing Autonomic workspace").with_total_hint(total);
 
     let dirs = progress.step("workspace directories");
     agent_body_core::ensure_dirs().context("create ~/.autonomic workspace")?;
+    agent_body_core::run_legacy_migrations().ok();
+    agent_body_core::ensure_default_ecosystem_sections().ok();
+    agent_body_core::scaffold_agents_dir().ok();
+    agent_body_core::write_default_gitignore().ok();
     dirs.done();
+
+    let agents = progress.step("AGENTS.md");
+    match agent_body_core::compose_agents_md() {
+        Ok(path) => {
+            println!("  agents:    {}", path.display());
+            agents.done();
+        }
+        Err(err) => {
+            agents.warn(format!("compose skipped: {err:#}"));
+        }
+    }
 
     let config = progress.step("config");
     let _ = Config::load()?;
@@ -49,6 +64,7 @@ pub fn init_project(name: Option<&str>) -> Result<()> {
     println!("Next steps:");
     println!("  autonomic start          # broker + daemons");
     println!("  autonomic doctor         # verify organ binaries");
+    println!("  autonomic agents compose --install  # AGENTS.md + host links");
     println!("  autonomic brain serve    # route to agent-brain");
     Ok(())
 }

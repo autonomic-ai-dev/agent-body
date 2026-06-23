@@ -50,6 +50,38 @@ pub fn config_path() -> PathBuf {
     autonomic_root().join("config.toml")
 }
 
+/// Vendor-neutral agent mode fragments (`base.md`, per-organ `*.md`).
+pub fn agents_dir() -> PathBuf {
+    autonomic_root().join("agents")
+}
+
+/// Composed AGENTS.md at workspace root.
+pub fn agents_md_path() -> PathBuf {
+    autonomic_root().join("AGENTS.md")
+}
+
+/// Default gitignore for whole-workspace sync.
+pub fn workspace_gitignore_path() -> PathBuf {
+    autonomic_root().join(".gitignore")
+}
+
+/// Spine workflows under unified workspace state.
+pub fn spine_config_dir() -> PathBuf {
+    organ_state_dir("spine")
+}
+
+/// Legacy agent-brain home (`~/.agent_brain`).
+pub fn legacy_brain_home() -> PathBuf {
+    home_dir().join(".agent_brain")
+}
+
+/// Legacy agent-spine config dir (`~/.config/agent-spine`).
+pub fn legacy_spine_config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("agent-spine")
+}
+
 /// Legacy per-organ YAML config path under XDG config dir.
 pub fn legacy_config_path(organ: &str) -> PathBuf {
     let legacy_autonomic = dirs::config_dir()
@@ -72,6 +104,7 @@ pub fn ensure_dirs() -> std::io::Result<()> {
     std::fs::create_dir_all(executions_dir())?;
     std::fs::create_dir_all(broker_dir())?;
     std::fs::create_dir_all(autonomic_root())?;
+    std::fs::create_dir_all(agents_dir())?;
     Ok(())
 }
 

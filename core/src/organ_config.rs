@@ -3,6 +3,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::fs;
 use std::path::Path;
 
+use crate::config_migrate;
 use crate::global_workspace;
 
 /// Load an organ's config from `~/.autonomic/config.toml` `[organ]` section,
@@ -12,6 +13,7 @@ where
     T: DeserializeOwned + Default + Serialize,
 {
     global_workspace::ensure_dirs().map_err(|e| anyhow::anyhow!(e))?;
+    let _ = config_migrate::run_legacy_migrations();
     let unified = global_workspace::config_path();
 
     if unified.exists() && let Some(cfg) = read_section(&unified, organ)? {
