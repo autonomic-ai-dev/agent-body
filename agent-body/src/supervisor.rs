@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use agent_body_core::organ_state_dir;
+use agent_body_core::ui::ProgressRun;
 
 use crate::nats_config;
 
@@ -62,46 +63,52 @@ const DAEMONS: &[DaemonSpec] = &[
 ];
 
 pub fn start_all() -> Result<()> {
+    let mut specs: Vec<_> = DAEMONS.iter().collect();
+    specs.sort_by_key(|s| s.start_order);
+    let mut progress =
+        ProgressRun::new("Starting Autonomic daemons").with_total_hint(specs.len() + 2);
+
+    let workspace = progress.step("workspace");
     agent_body_core::ensure_dirs()?;
     let supervisor_dir = supervisor_dir();
     fs::create_dir_all(&supervisor_dir)?;
+    workspace.done();
 
+    let nats_step = progress.step("nats security");
     let nats_bootstrap = match nats_config::ensure_nats_security() {
         Ok(b) => {
-            println!(
-                "  ✓ NATS security configured ({})",
-                b.config_path.display()
-            );
+            nats_step.done();
             Some(b)
         }
         Err(e) => {
-            eprintln!("  ! NATS security bootstrap failed: {e}");
+            nats_step.warn(format!("{e:#}"));
             None
         }
     };
 
-    println!("Starting autonomic daemons (ordered)...");
-    let mut specs: Vec<_> = DAEMONS.iter().collect();
-    specs.sort_by_key(|s| s.start_order);
-
     for spec in specs {
+        let step = progress.step(spec.name);
         match start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
-            Ok(pid) => {
-                println!("  ✓ {} (pid {pid})", spec.name);
-                if let Err(e) = wait_for_health(spec, 15) {
-                    eprintln!("  ! {} — {e}", spec.name);
-                }
-            }
-            Err(e) => println!("  ✗ {} — {e}", spec.name),
+            Ok(pid) => match wait_for_health(spec, 15) {
+                Ok(()) => step.done(),
+                Err(e) => step.warn(format!("pid {pid} — {e:#}")),
+            },
+            Err(e) if e.to_string().contains("already running") => step.cached(),
+            Err(e) => step.fail(format!("{e:#}")),
         }
     }
 
+    let snapshot = progress.step("status snapshot");
     write_status_snapshot()?;
+    snapshot.done();
 
-    if std::env::var("AUTONOMIC_NATS_URL").is_err() {
-        println!("  hint: export AUTONOMIC_NATS_URL=nats://localhost:4222");
+    let summary = progress.finish()?;
+    if summary.failed > 0 {
+        anyhow::bail!("one or more daemons failed to start");
     }
-
+    if std::env::var("AUTONOMIC_NATS_URL").is_err() {
+        eprintln!("hint: export AUTONOMIC_NATS_URL=nats://localhost:4222");
+    }
     Ok(())
 }
 
@@ -112,15 +119,26 @@ pub fn stop_all() -> Result<()> {
         return Ok(());
     }
 
-    println!("Stopping autonomic daemons (reverse order)...");
     let mut specs: Vec<_> = DAEMONS.iter().collect();
     specs.sort_by_key(|s| std::cmp::Reverse(s.start_order));
+    let mut progress =
+        ProgressRun::new("Stopping Autonomic daemons").with_total_hint(specs.len() + 1);
 
     for spec in specs {
-        stop_daemon(spec)?;
+        let step = progress.step(spec.name);
+        let pid_path = supervisor_dir.join(format!("{}.pid", spec.name));
+        if read_running_pid(&pid_path)?.is_none() {
+            step.cached();
+        } else {
+            stop_daemon(spec, true)?;
+            step.done();
+        }
     }
 
+    let snapshot = progress.step("status snapshot");
     write_status_snapshot()?;
+    snapshot.done();
+    progress.finish()?;
     Ok(())
 }
 
@@ -170,7 +188,7 @@ pub fn supervise(interval_secs: u64) -> Result<()> {
             if !running || !healthy {
                 if running {
                     eprintln!("  ! {} unhealthy — restarting", spec.name);
-                    stop_daemon(spec).ok();
+                    stop_daemon(spec, false).ok();
                 } else {
                     eprintln!("  ! {} not running — starting", spec.name);
                 }
@@ -235,7 +253,7 @@ fn start_daemon(
         if check_health(spec.health_url) {
             anyhow::bail!("already running and healthy (pid {existing})");
         }
-        stop_daemon(spec).ok();
+        stop_daemon(spec, false).ok();
     }
 
     if !binary_on_path(spec.binary) {
@@ -295,7 +313,7 @@ fn start_daemon(
     Ok(pid)
 }
 
-fn stop_daemon(spec: &DaemonSpec) -> Result<()> {
+fn stop_daemon(spec: &DaemonSpec, quiet: bool) -> Result<()> {
     let pid_path = supervisor_dir().join(format!("{}.pid", spec.name));
     let Some(pid) = read_running_pid(&pid_path)? else {
         return Ok(());
@@ -308,7 +326,9 @@ fn stop_daemon(spec: &DaemonSpec) -> Result<()> {
 
     for _ in 0..10 {
         if read_running_pid(&pid_path)?.is_none() {
-            println!("  stopped {} (pid {pid})", spec.name);
+            if !quiet {
+                println!("  stopped {} (pid {pid})", spec.name);
+            }
             return Ok(());
         }
         thread::sleep(Duration::from_millis(300));
@@ -319,7 +339,9 @@ fn stop_daemon(spec: &DaemonSpec) -> Result<()> {
         .arg(pid.to_string())
         .status();
     fs::remove_file(&pid_path).ok();
-    println!("  force-stopped {} (pid {pid})", spec.name);
+    if !quiet {
+        println!("  force-stopped {} (pid {pid})", spec.name);
+    }
     Ok(())
 }
 

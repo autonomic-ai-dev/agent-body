@@ -2,15 +2,28 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 
+use agent_body_core::ui::ProgressRun;
+
 use crate::config::Config;
 
 pub fn init_project(name: Option<&str>) -> Result<()> {
+    let total = if name.is_some() { 3 } else { 2 };
+    let mut progress = ProgressRun::new("Initializing Autonomic workspace").with_total_hint(total);
+
+    let dirs = progress.step("workspace directories");
     agent_body_core::ensure_dirs().context("create ~/.autonomic workspace")?;
+    dirs.done();
+
+    let config = progress.step("config");
     let _ = Config::load()?;
+    config.done();
 
     if let Some(project) = name {
-        let dir = PathBuf::from(project);
+        let scaffold = progress.step(format!("project '{project}'"));
+        let dir = PathBuf::from(&project);
         if dir.exists() {
+            scaffold.fail(format!("project directory '{}' already exists", dir.display()));
+            progress.finish()?;
             anyhow::bail!("project directory '{}' already exists", dir.display());
         }
         fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
@@ -19,8 +32,10 @@ pub fn init_project(name: Option<&str>) -> Result<()> {
             project = project
         );
         fs::write(dir.join("README.md"), readme)?;
-        println!("Created project '{}'", dir.display());
+        scaffold.done();
     }
+
+    progress.finish()?;
 
     println!("Autonomic workspace ready.");
     println!("  config:    {}", agent_body_core::config_path().display());
@@ -32,7 +47,7 @@ pub fn init_project(name: Option<&str>) -> Result<()> {
     );
     println!();
     println!("Next steps:");
-    println!("  autonomic start          # broker + heart daemons");
+    println!("  autonomic start          # broker + daemons");
     println!("  autonomic doctor         # verify organ binaries");
     println!("  autonomic brain serve    # route to agent-brain");
     Ok(())
