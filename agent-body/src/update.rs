@@ -1,73 +1,93 @@
 use anyhow::{Context, Result};
-use std::process::Command;
+use std::process::{Command, Stdio};
+
+use agent_body_core::github_release::github_api_token;
+use agent_body_core::ui::ProgressRun;
 
 use crate::router::{self, ORGANS};
 
 pub fn run_update(force: bool) -> Result<()> {
-    println!("Updating all Autonomic organs from latest GitHub releases...\n");
+    if github_api_token().is_none() {
+        eprintln!(
+            "Note: GITHUB_TOKEN not set — updates use release redirects; API fallback may rate-limit."
+        );
+    }
 
-    let mut updated = 0u32;
-    let mut skipped = 0u32;
+    let dashboard_steps = 2u32;
+    let organ_steps = ORGANS.len() as u32;
+    let total = organ_steps + dashboard_steps;
+    let mut progress = ProgressRun::new("Updating Autonomic stack").with_total_hint(total as usize);
+
     let mut failed = 0u32;
 
     for (alias, binary) in ORGANS {
+        let step = progress.step(*alias);
         let which = Command::new("which").arg(binary).output();
         if !which.is_ok_and(|o| o.status.success()) {
-            println!("  {alias:<10} {binary:<16} not installed — skipping");
-            skipped += 1;
+            step.warn(format!("{binary} not installed — skipping"));
             continue;
         }
 
-        print!("  {alias:<10} {binary:<16} ");
         let mut cmd = Command::new(binary);
         cmd.arg("update");
         if force {
             cmd.arg("--force");
         }
-        let result = cmd
-            .stdin(std::process::Stdio::inherit())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status()
+        let output = cmd
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
             .with_context(|| format!("spawn {binary} update"))?;
 
-        if result.success() {
-            updated += 1;
+        if output.status.success() {
+            step.done();
         } else {
-            // The organ already printed its own error message
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let mut detail = stderr.trim().to_string();
+            if detail.is_empty() {
+                detail = format!("{binary} update exited with {}", output.status);
+            }
+            if detail.contains("403") || detail.contains("rate limit") {
+                detail.push_str(
+                    "\nSet GITHUB_TOKEN or GH_TOKEN (public repo read is enough) and retry `autonomic update --force`.",
+                );
+            }
+            step.fail(detail);
             failed += 1;
         }
     }
 
-    println!();
-    if updated > 0 || failed > 0 {
-        println!("{updated} updated, {failed} failed, {skipped} skipped");
-    }
-    if failed > 0 {
-        println!("Some updates failed. You can retry with `autonomic update --force`.");
+    let tui_step = progress.step("agent-tui");
+    match crate::tui_install::update(force) {
+        Ok(true) => {
+            tui_step.done();
+        }
+        Ok(false) => tui_step.cached(),
+        Err(err) => {
+            tui_step.warn(format!("{err:#}"));
+        }
     }
 
-    update_dashboards(force)?;
+    let ui_step = progress.step("agent-ui relay");
+    match crate::ui_relay::update(force) {
+        Ok(true) => {
+            ui_step.done();
+        }
+        Ok(false) => ui_step.cached(),
+        Err(err) => {
+            ui_step.warn(format!("{err:#}"));
+        }
+    }
+
+    let summary = progress.finish()?;
+
+    if summary.failed > 0 {
+        eprintln!("{failed} organ update(s) failed. Retry with `autonomic update --force`.");
+        show_versions()?;
+        anyhow::bail!("update failed");
+    }
 
     show_versions()
-}
-
-fn update_dashboards(force: bool) -> Result<()> {
-    println!("\nOptional dashboards:");
-
-    match crate::tui_install::update(force) {
-        Ok(true) => println!("  agent-tui  updated"),
-        Ok(false) => println!("  agent-tui  already up to date"),
-        Err(err) => println!("  agent-tui  update failed: {err:#}"),
-    }
-
-    match crate::ui_relay::update(force) {
-        Ok(true) => println!("  agent-ui   relay updated"),
-        Ok(false) => println!("  agent-ui   relay already up to date"),
-        Err(err) => println!("  agent-ui   relay update failed: {err:#}"),
-    }
-
-    Ok(())
 }
 
 pub fn show_versions() -> Result<()> {

@@ -1,10 +1,33 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+use agent_body_core::ui::ProgressMode;
 
 #[derive(Parser)]
 #[command(name = "autonomic", about = "Autonomic AI ecosystem manager", version)]
 struct Cli {
+    /// Progress output style (Docker BuildKit-like): auto, plain, or quiet
+    #[arg(long, value_enum, global = true, default_value = "auto")]
+    progress: ProgressArg,
+
     #[command(subcommand)]
     command: Option<Commands>,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ProgressArg {
+    Auto,
+    Plain,
+    Quiet,
+}
+
+impl From<ProgressArg> for ProgressMode {
+    fn from(value: ProgressArg) -> Self {
+        match value {
+            ProgressArg::Auto => ProgressMode::Auto,
+            ProgressArg::Plain => ProgressMode::Plain,
+            ProgressArg::Quiet => ProgressMode::Quiet,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -32,7 +55,14 @@ enum Commands {
         force: bool,
     },
     /// Verify organ binaries, workspace, and check logs for errors
-    Doctor,
+    Doctor {
+        /// Binaries and workspace only — skip supervisor log scan
+        #[arg(long)]
+        quick: bool,
+        /// Alias for --quick
+        #[arg(long, hide = true)]
+        binaries_only: bool,
+    },
     /// Show workspace paths and daemon supervisor status
     Status,
     /// Display or follow daemon logs
@@ -80,6 +110,7 @@ fn main() -> anyhow::Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     let cli = Cli::parse();
+    apply_progress_env(cli.progress);
 
     match cli.command {
         Some(Commands::Init { name }) => agent_body::init::init_project(name.as_deref())?,
@@ -88,16 +119,9 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Restart) => agent_body::supervisor::restart_all()?,
         Some(Commands::Supervise { interval }) => agent_body::supervisor::supervise(interval)?,
         Some(Commands::Update { force }) => agent_body::update::run_update(force)?,
-        Some(Commands::Doctor) => {
-            let healthy = rt.block_on(agent_body::doctor::check_all())?;
-            println!();
-            let logs_ok = agent_body::doctor::check_logs()?;
-            if healthy && logs_ok {
-                println!("\nAll systems healthy.");
-            } else {
-                println!("\nSome checks failed. Run `autonomic update` for version details.");
-                std::process::exit(1);
-            }
+        Some(Commands::Doctor { quick, binaries_only }) => {
+            let quick = quick || binaries_only;
+            rt.block_on(agent_body::doctor::run(quick))?;
         }
         Some(Commands::Status) => {
             let _ = agent_body::config::Config::load()?;
@@ -154,4 +178,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn apply_progress_env(mode: ProgressArg) {
+    let value = match ProgressMode::from(mode) {
+        ProgressMode::Auto => "auto",
+        ProgressMode::Plain => "plain",
+        ProgressMode::Quiet => "quiet",
+    };
+    std::env::set_var("AUTONOMIC_PROGRESS", value);
 }
