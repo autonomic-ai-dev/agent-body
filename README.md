@@ -184,6 +184,8 @@ The integration surface between organs is defined by three layers:
 | Path | Purpose |
 |------|---------|
 | `~/.autonomic/config.toml` | Unified organ configuration |
+| `~/.autonomic/AGENTS.md` | Composed vendor-neutral agent mode (symlinked to hosts) |
+| `~/.autonomic/agents/` | Per-organ mode fragments (`base.md`, `brain.md`, …) |
 | `~/.autonomic/memory/` | agent-brain knowledge store |
 | `~/.autonomic/broker/` | NATS/JetStream persistence |
 | `~/.autonomic/logs/spine/` | Workflow execution history |

@@ -31,6 +31,16 @@ impl From<ProgressArg> for ProgressMode {
 }
 
 #[derive(Subcommand)]
+enum AgentsCommands {
+    /// Rebuild ~/.autonomic/AGENTS.md
+    Compose {
+        /// Install host symlinks to composed AGENTS.md
+        #[arg(long)]
+        install: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// Scaffold workspace and optional project directory
     Init {
@@ -53,6 +63,21 @@ enum Commands {
         /// Force re-download even if already at latest
         #[arg(short, long)]
         force: bool,
+        /// Update a single organ alias (brain, spine, heart, ...)
+        #[arg(long)]
+        organ: Option<String>,
+    },
+    /// Git sync for whole ~/.autonomic workspace
+    Sync {
+        #[arg(required = true)]
+        target: String,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Compose AGENTS.md from ~/.autonomic/agents fragments
+    Agents {
+        #[command(subcommand)]
+        command: AgentsCommands,
     },
     /// Verify organ binaries, workspace, and check logs for errors
     Doctor {
@@ -118,7 +143,23 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
         Some(Commands::Restart) => agent_body::supervisor::restart_all()?,
         Some(Commands::Supervise { interval }) => agent_body::supervisor::supervise(interval)?,
-        Some(Commands::Update { force }) => agent_body::update::run_update(force)?,
+        Some(Commands::Update { force, organ }) => {
+            agent_body::update::run_update(force, organ.as_deref())?
+        }
+        Some(Commands::Sync { target, args }) => {
+            let mut argv = vec![target];
+            argv.extend(args);
+            agent_body::sync_cmd::run(&argv)?;
+        }
+        Some(Commands::Agents { command }) => match command {
+            AgentsCommands::Compose { install } => {
+                if install {
+                    agent_body::agents::compose_and_link()?;
+                } else {
+                    agent_body::agents::compose()?;
+                }
+            }
+        },
         Some(Commands::Doctor { quick, binaries_only }) => {
             let quick = quick || binaries_only;
             rt.block_on(agent_body::doctor::run(quick))?;

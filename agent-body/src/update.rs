@@ -6,7 +6,7 @@ use agent_body_core::ui::ProgressRun;
 
 use crate::router::{self, ORGANS};
 
-pub fn run_update(force: bool) -> Result<()> {
+pub fn run_update(force: bool, only_organ: Option<&str>) -> Result<()> {
     if github_api_token().is_none() {
         eprintln!(
             "Note: GITHUB_TOKEN not set — updates use release redirects; API fallback may rate-limit."
@@ -21,7 +21,16 @@ pub fn run_update(force: bool) -> Result<()> {
     let mut failed = 0u32;
 
     for (alias, binary) in ORGANS {
+        if let Some(only) = only_organ {
+            if *alias != only {
+                continue;
+            }
+        }
         let step = progress.step(*alias);
+        if !force && !agent_body_core::should_update_organ(alias, false).unwrap_or(true) {
+            step.warn(format!("{alias} update disabled in config — skipping"));
+            continue;
+        }
         let which = Command::new("which").arg(binary).output();
         if !which.is_ok_and(|o| o.status.success()) {
             step.warn(format!("{binary} not installed — skipping"));

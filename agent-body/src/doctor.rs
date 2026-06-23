@@ -11,10 +11,28 @@ fn log_dir() -> PathBuf {
 
 pub async fn run(quick: bool) -> Result<()> {
     let organ_count = crate::router::ORGANS.len();
-    let total = if quick { organ_count } else { organ_count + 1 };
+    let total = if quick { organ_count + 2 } else { organ_count + 3 };
     let mut progress = ProgressRun::new("Autonomic health check").with_total_hint(total);
 
     agent_body_core::ensure_dirs().ok();
+
+    let cfg = progress.step("unified config");
+    let config_path = agent_body_core::config_path();
+    if config_path.is_file() {
+        println!("  ✓ config: {}", config_path.display());
+        cfg.done();
+    } else {
+        cfg.warn("missing ~/.autonomic/config.toml — run `autonomic init`");
+    }
+
+    let agents_md = progress.step("AGENTS.md");
+    let agents_path = agent_body_core::agents_md_path();
+    if agents_path.is_file() {
+        println!("  ✓ agents: {}", agents_path.display());
+        agents_md.done();
+    } else {
+        agents_md.warn("missing AGENTS.md — run `autonomic agents compose`");
+    }
 
     let mut all_healthy = true;
     for (alias, binary) in crate::router::ORGANS {
