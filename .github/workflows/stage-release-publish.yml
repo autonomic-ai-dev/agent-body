@@ -54,3 +54,20 @@ jobs:
           files: dist/*
           draft: false
           prerelease: false
+
+      - name: Bump Homebrew tap (optional)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_DISPATCH_TOKEN not set; homebrew-tap hourly poll will bump instead."
+            exit 0
+          fi
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          gh api --method POST repos/autonomic-ai-dev/homebrew-tap/dispatches \
+            -f event_type='agent-body-release' \
+            -f "client_payload[version]=${VERSION}"
