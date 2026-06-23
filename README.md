@@ -113,16 +113,37 @@ agent-body solves all three with a single meta-CLI:
 
 ## Quick Install
 
+Three paths:
+
+| Path | Command |
+|------|---------|
+| **curl (all organs)** | `curl -fsSL …/install-all-organs.sh \| bash` |
+| **curl (meta CLI only)** | `curl -fsSL …/install.sh \| bash` |
+| **Homebrew (macOS)** | `brew tap autonomic-ai-dev/tap && brew install autonomic-stack` |
+
+### curl — full stack
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install-all-organs.sh | bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Meta CLI only (no organs):
+### curl — meta CLI only
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash
 ln -sf ~/.local/bin/agent-body ~/.local/bin/autonomic
 ```
+
+### Homebrew (macOS)
+
+```bash
+brew tap autonomic-ai-dev/tap
+brew install autonomic          # agent-body binary + autonomic symlink
+brew install autonomic-stack  # all organ release binaries + nats-server
+```
+
+See [config.full.example.toml](docs/config.full.example.toml) for integrated `~/.autonomic/config.toml` samples per organ.
 
 Verify:
 ```bash

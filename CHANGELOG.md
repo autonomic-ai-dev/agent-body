@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] - 2026-06-23
+
+### Added
+
+- **agent-body-core 0.3.4** — shared `github_release` (redirect-first tag fetch, `GITHUB_TOKEN` API fallback, macOS adhoc sign)
+- **ProgressTree** — Docker BuildKit-style progress on `autonomic update`, `doctor`, `init`, `start`, and `stop`; global `--progress auto|plain|quiet`
+- **`doctor --quick`** — binaries-only health check (skips supervisor log scan); used at end of `install-all-organs.sh`
+- **`scripts/lib/github.sh`** — shared GitHub release helpers for install scripts
+
+### Changed
+
+- Install scripts: optional `nats-server` (skip when working; `FORCE_NATS=1` to override), macOS adhoc codesign, quieter organ installs
+- CI: `pipeline-compose-run@v1.17.1` with PR head ref (fixes `refs/pull/N/merge` dispatch failures)
+- Removed GHA `concurrency:` groups so in-flight runs are not cancelled
+
 ## [0.5.11] - 2026-06-21
 
 ### Changed
