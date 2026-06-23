@@ -1,18 +1,20 @@
 # agent-body — Autonomic AI Ecosystem Manager
 
-**Unified CLI, daemon supervisor, and workspace scaffold for the Autonomic AI organ stack.**
+**Cloud-Native role: Control plane** (`kubectl` / apiserver analog) — unified CLI, daemon supervisor, and workspace scaffold.
 
-`agent-body` is the entry point to the entire Autonomic ecosystem. It installs every organ binary, manages a shared `~/.autonomic/` workspace with unified configuration, supervises the NATS broker and core daemons, and exposes the **`autonomic`** command that routes to every peripheral.
+`agent-body` is the **Agent OS** for the Autonomic stack. It installs every component binary, manages a shared `~/.autonomic/` workspace with unified configuration, supervises the NATS broker and core daemons, and exposes the **`autonomic`** command that routes to every peripheral.
 
-Without agent-body, you install and configure 8+ binaries separately. With it, you run `autonomic start` and every organ discovers each other through shared config, the spine event bus at `:3100`, and the NATS JetStream stream.
+Without agent-body, you install and configure 8+ binaries separately. With it, you run `autonomic start` and every daemon discovers peers through shared config, the spine event bus at `:3100`, and the NATS JetStream stream.
+
+> Codename: *body organ*. See [Cloud-Native Platform mapping](docs/cloud-native-platform.md) for the full K8s analogy.
 
 ---
 
 ## Core Concept
 
-Autonomic AI is built as a **biological architecture** — specialized organs (brain, spine, heart, nerves, muscle, immune, eyes, mouth) that communicate through well-defined interfaces. agent-body is the **body**: it contains the meta-CLI, the daemon supervisor, and the workspace that makes all organs cohere.
+Autonomic AI is **cloud-native AI infrastructure** — specialized daemons (brain, spine, heart, nerves, muscle, immune, eyes, mouth) that communicate through well-defined interfaces. `agent-body` is the **control plane**: meta-CLI, supervisor, and workspace that makes the stack cohere.
 
-The key insight: **structure beats intelligence.** Instead of a monolithic agent that tries to do everything, each organ does one thing well. agent-body ensures they all speak the same config, share the same workspace, and start in the right order.
+The key insight: **structure beats intelligence.** Instead of a monolithic agent that tries to do everything, each component does one job well. agent-body ensures they share config, workspace layout, and boot order — like `kubectl` plus a local kubelet supervisor.
 
 ```mermaid
 graph TD
