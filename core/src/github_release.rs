@@ -2,6 +2,8 @@ use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::ui::ProgressRun;
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -259,24 +261,54 @@ pub fn run_organ_self_update(
     current_version: &str,
     force: bool,
 ) -> Result<bool> {
-    let latest = fetch_latest_tag(repo, binary)?;
+    let mut progress =
+        ProgressRun::new(format!("Updating {binary}")).with_total_hint(4);
+
+    let fetch = progress.step("fetch latest release");
+    let latest = match fetch_latest_tag(repo, binary) {
+        Ok(tag) => {
+            fetch.done();
+            tag
+        }
+        Err(err) => {
+            fetch.fail(format!("{err:#}"));
+            progress.finish()?;
+            return Err(err);
+        }
+    };
+
     let latest_ver = latest.trim_start_matches('v');
     let current_ver = current_version.trim_start_matches('v');
 
+    let compare = progress.step("compare versions");
     if !force && !version_is_newer(latest_ver, current_ver) {
-        println!("{binary} already at latest version ({current_version})");
+        compare.cached();
+        progress.finish()?;
         return Ok(false);
     }
+    compare.done();
 
     let exe = std::env::current_exe().context("get current exe path")?;
     let tmp = exe.with_extension("download");
 
-    println!("Downloading {binary} {latest}...");
-    download_release_binary(repo, binary, &tmp, &latest)?;
-    std::fs::rename(&tmp, &exe).context("replace binary")?;
-    adhoc_sign_macos(&exe);
+    let download = progress.step(format!("download {latest}"));
+    if let Err(err) = download_release_binary(repo, binary, &tmp, &latest) {
+        download.fail(format!("{err:#}"));
+        progress.finish()?;
+        return Err(err);
+    }
+    download.done();
 
-    println!("Updated {binary} from v{current_version} to v{latest}");
+    let install = progress.step("install binary");
+    if let Err(err) = std::fs::rename(&tmp, &exe).context("replace binary") {
+        install.fail(format!("{err:#}"));
+        progress.finish()?;
+        return Err(err);
+    }
+    adhoc_sign_macos(&exe);
+    install.done();
+
+    progress.finish()?;
     Ok(true)
 }
 
