@@ -1,20 +1,25 @@
-# agent-body — Autonomic AI Ecosystem Manager
+# agent-body — The Autonomic Control Plane
 
 **Cloud-Native role: Control plane** (`kubectl` / apiserver analog) — unified CLI, daemon supervisor, and workspace scaffold.
 
-`agent-body` is the **Agent OS** for the Autonomic stack. It installs every component binary, manages a shared `~/.autonomic/` workspace with unified configuration, supervises the NATS broker and core daemons, and exposes the **`autonomic`** command that routes to every peripheral.
+`agent-body` is the **Control Plane** for the Autonomic cluster. It provides the **`autonomic`** meta-CLI, manages the shared `~/.autonomic/` workspace, and acts as the local process supervisor (like `systemd` or `kubelet`) for all isolated daemons.
 
-Without agent-body, you install and configure 8+ binaries separately. With it, you run `autonomic start` and every daemon discovers peers through shared config, the spine event bus at `:3100`, and the NATS JetStream stream.
-
-> Codename: *body organ*. See [Cloud-Native Platform mapping](docs/cloud-native-platform.md) for the full K8s analogy.
+Without `agent-body`, you would have to manually configure, boot, and monitor 8 different binaries. With it, you run a single command (`autonomic start`) to boot the entire cluster in the correct topological order.
 
 ---
 
-## Core Concept
+## Under the Hood: How it Works
 
-Autonomic AI is **cloud-native AI infrastructure** — specialized daemons (brain, spine, heart, nerves, muscle, immune, eyes, mouth) that communicate through well-defined interfaces. `agent-body` is the **control plane**: meta-CLI, supervisor, and workspace that makes the stack cohere.
+Autonomic AI rejects monolithic agent design in favor of **cloud-native microservices**. But microservices require orchestration. `agent-body` solves this via three mechanisms:
 
-The key insight: **structure beats intelligence.** Instead of a monolithic agent that tries to do everything, each component does one job well. agent-body ensures they share config, workspace layout, and boot order — like `kubectl` plus a local kubelet supervisor.
+1. **Topological Boot Ordering (Supervisor)**
+When you run `autonomic start`, it doesn't just launch processes blindly. It spawns the NATS message broker first, probes it for readiness, then spawns `agent-nerves` (the mesh), then boots the dependent daemons (`muscle`, `immune`, etc.). If a daemon crashes due to a memory leak, the supervisor catches the exit code and automatically restarts it with exponential backoff.
+
+2. **Unified Configuration Plane**
+Instead of 8 different config files, `agent-body` provides `autonomic init` which scaffolds a single `~/.autonomic/config.toml`. All daemons dynamically load their specific `[sections]` from this unified file, ensuring port assignments and NATS URLs are perfectly synchronized.
+
+3. **The MCP API Gateway**
+`agent-body` implements `autonomic serve-mcp`. This acts as a gateway that dynamically queries all running daemons over the NATS bus, aggregates their available tools, and exposes a single, massive MCP server to your external LLM orchestrator (like Cursor or Claude Desktop).
 
 ```mermaid
 graph TD
