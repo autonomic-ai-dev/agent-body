@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.14] - 2026-06-27
+
+### Added
+
+- **MCP API Gateway** (`autonomic serve-mcp`) — unified entry point aggregating all organ MCP tools via persistent child-process connections
+- **Persistent connections** — gateway spawns each organ binary once (lazy connect), keeps `RunningService` handle for reuse across tool calls
+- **`serve-mcp` builtin** — added to `BUILTIN_COMMANDS` in router.rs so it routes to gateway instead of organ proxy
+- **Integration tests** — gateway route resolution, tool-to-organ mapping, tool definition validation
+
+### Changed
+
+- Gateway routes updated: heart, eyes, immune now use `serve-mcp` subcommand (MCP-only, no HTTP daemon)
+
 ## [Unreleased]
 
 ### Added

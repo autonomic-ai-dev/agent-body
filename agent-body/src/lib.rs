@@ -3,6 +3,7 @@ pub mod config;
 pub mod doctor;
 pub mod init;
 pub mod log;
+pub mod mcp_gateway;
 pub mod nats_config;
 pub mod router;
 pub mod supervisor;

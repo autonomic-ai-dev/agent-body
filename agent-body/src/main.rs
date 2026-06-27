@@ -112,6 +112,8 @@ enum Commands {
         #[arg(short, long)]
         force: bool,
     },
+    /// Start the MCP Gateway server over stdio (aggregates all organ MCP tools)
+    ServeMcp,
     /// Launch the Autonomic Web Dashboard
     Ui {
         /// Open the hosted dashboard without starting the local NATS relay
@@ -183,6 +185,7 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Tui { force }) => agent_body::tui_install::run(force)?,
         Some(Commands::Ui { open_only, force }) => agent_body::ui_relay::run(open_only, force)?,
+        Some(Commands::ServeMcp) => rt.block_on(agent_body::mcp_gateway::McpGateway::run())?,
         Some(Commands::Log { name, follow, list }) => {
             if list {
                 let logs = agent_body::log::list_logs()?;

@@ -114,6 +114,7 @@ agent-body solves all three with a single meta-CLI:
 | `autonomic update` | List installed organ versions on PATH |
 | `autonomic status` | Workspace paths + supervisor PID/health table |
 | `autonomic tui` | Live CPU/RAM dashboard for autonomic processes |
+| `autonomic serve-mcp` | Start MCP API Gateway (aggregates all organ tools over stdio) |
 | `autonomic <organ> …` | Proxy any command to `agent-{organ}` |
 
 ---
