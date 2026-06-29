@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2026-06-29
+
+### Fixed
+
+- **MCP gateway tool registration** — rewrite `serve-mcp` with rmcp `#[tool_router]` / `#[tool_handler]` (matching agent-brain and agent-muscle) so tools expose JSON Schema draft 2020-12 `inputSchema` with `properties` and `required`; fixes empty `{}` schemas that prevented Cursor and OpenCode from registering agent-body tools
+- **`serverInfo` identity** — MCP `initialize` handshake reports `name: agent-body` and package version instead of generic `rmcp`
+
+### Changed
+
+- Gateway uses `server.serve(stdio())` instead of `serve_server` for transport consistency with other Autonomic organs
+
 ## [0.5.14] - 2026-06-27
 
 ### Added
