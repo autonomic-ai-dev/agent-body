@@ -37,6 +37,18 @@ pub fn run_update(force: bool, only_organ: Option<&str>) -> Result<()> {
             continue;
         }
 
+        // Check if binary supports the `update` subcommand before calling it.
+        let check = Command::new(binary).arg("update").arg("--help").output();
+        match check {
+            Ok(ref o) if o.status.success() => {}
+            _ => {
+                step.warn(format!(
+                    "{binary} has no update subcommand — install/update via Homebrew or `cargo install`"
+                ));
+                continue;
+            }
+        }
+
         let mut cmd = Command::new(binary);
         cmd.arg("update");
         if force {

@@ -29,9 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Gateway routes updated: heart, eyes, immune now use `serve-mcp` subcommand (MCP-only, no HTTP daemon)
 
-## [Unreleased]
+## [0.5.15] - 2026-06-30
 
-### Added
+### Fixed
+
+- **`autonomic update` — missing organ subcommand** — check `{binary} update --help` before calling it; skip organs that don't support the `update` subcommand instead of failing the entire update stack
+
+### Changed
 
 - **agent-body-core 0.3.5** — `cli::progress` helpers (`apply_progress_env`, `strip_progress_argv`); ProgressTree on `run_organ_self_update`
 
