@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.16] - 2026-06-30
+
+### Fixed
+
+- **`autonomic update` — missing organ subcommand** — check `{binary} update --help` before calling it; skip organs that don't support the `update` subcommand instead of failing the entire update stack
+
+### Changed
+
+- **agent-body-core 0.3.5** — `cli::progress` helpers (`apply_progress_env`, `strip_progress_argv`); ProgressTree on `run_organ_self_update`
+
 ## [0.5.15] - 2026-06-29
 
 ### Fixed
@@ -28,16 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Gateway routes updated: heart, eyes, immune now use `serve-mcp` subcommand (MCP-only, no HTTP daemon)
-
-## [0.5.15] - 2026-06-30
-
-### Fixed
-
-- **`autonomic update` — missing organ subcommand** — check `{binary} update --help` before calling it; skip organs that don't support the `update` subcommand instead of failing the entire update stack
-
-### Changed
-
-- **agent-body-core 0.3.5** — `cli::progress` helpers (`apply_progress_env`, `strip_progress_argv`); ProgressTree on `run_organ_self_update`
 
 ## [0.5.12] - 2026-06-23
 
