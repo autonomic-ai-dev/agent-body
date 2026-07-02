@@ -31,6 +31,15 @@ impl From<ProgressArg> for ProgressMode {
 }
 
 #[derive(Subcommand)]
+enum DoctorCommands {
+    /// Workspace + organ version summary (no log scan)
+    Stats {
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum AgentsCommands {
     /// Rebuild ~/.autonomic/AGENTS.md
     Compose {
@@ -81,6 +90,8 @@ enum Commands {
     },
     /// Verify organ binaries, workspace, and check logs for errors
     Doctor {
+        #[command(subcommand)]
+        command: Option<DoctorCommands>,
         /// Binaries and workspace only — skip supervisor log scan
         #[arg(long)]
         quick: bool,
@@ -162,10 +173,18 @@ fn main() -> anyhow::Result<()> {
                 }
             }
         },
-        Some(Commands::Doctor { quick, binaries_only }) => {
-            let quick = quick || binaries_only;
-            rt.block_on(agent_body::doctor::run(quick))?;
-        }
+        Some(Commands::Doctor {
+            command,
+            quick,
+            binaries_only,
+        }) => match command {
+            Some(DoctorCommands::Stats { json }) => {
+                rt.block_on(agent_body::doctor::run_stats(json))?;
+            }
+            None => {
+                rt.block_on(agent_body::doctor::run(quick || binaries_only))?;
+            }
+        },
         Some(Commands::Status) => {
             let _ = agent_body::config::Config::load()?;
             println!("autonomic status");

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] - 2026-07-02
+
+### Added
+
+- **agent-body-core 0.3.7 — `wasm` feature** — shared `wasm_engine` module with Wasmtime engine singleton and blake3-keyed module cache
+- **`SandboxExecute` / `ExecuteResult` fuel fields** — `wasm_path`, `fuel_limit`, `memory_limit_bytes`, `fuel_consumed`, `memory_peak_bytes` for WASM sandbox accounting
+- **`autonomic doctor stats`** — one-line workspace/organ summary with `--json` (no full health-check progress tree)
+
 ## [0.5.16] - 2026-06-30
 
 ### Fixed

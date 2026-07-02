@@ -4,6 +4,70 @@ use std::path::PathBuf;
 
 use agent_body_core::ui::ProgressRun;
 use anyhow::Result;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct DoctorStats {
+    pub workspace: String,
+    pub config: String,
+    pub memory: String,
+    pub broker: String,
+    pub organs: Vec<OrganStat>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrganStat {
+    pub alias: String,
+    pub binary: String,
+    pub version: Option<String>,
+    pub ok: bool,
+}
+
+pub async fn run_stats(json: bool) -> Result<()> {
+    agent_body_core::ensure_dirs().ok();
+
+    let mut organs = Vec::new();
+    for (alias, binary) in crate::router::ORGANS {
+        match check_binary(binary).await {
+            Ok(version) => organs.push(OrganStat {
+                alias: (*alias).to_string(),
+                binary: (*binary).to_string(),
+                version: Some(version),
+                ok: true,
+            }),
+            Err(_) => organs.push(OrganStat {
+                alias: (*alias).to_string(),
+                binary: (*binary).to_string(),
+                version: None,
+                ok: false,
+            }),
+        }
+    }
+
+    let snapshot = DoctorStats {
+        workspace: agent_body_core::autonomic_root().display().to_string(),
+        config: agent_body_core::config_path().display().to_string(),
+        memory: agent_body_core::memory_dir().display().to_string(),
+        broker: agent_body_core::broker_dir().display().to_string(),
+        organs,
+    };
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&snapshot)?);
+    } else {
+        println!("{}", format_stats_line(&snapshot));
+    }
+    Ok(())
+}
+
+pub fn format_stats_line(stats: &DoctorStats) -> String {
+    let healthy = stats.organs.iter().filter(|o| o.ok).count();
+    let total = stats.organs.len();
+    format!(
+        "autonomic workspace={} organs={}/{} healthy config={}",
+        stats.workspace, healthy, total, stats.config
+    )
+}
 
 fn log_dir() -> PathBuf {
     agent_body_core::organ_state_dir("supervisor").join("logs")
@@ -191,4 +255,35 @@ fn scan_log_for_errors(path: &PathBuf, max_lines: usize) -> Result<Vec<String>> 
     }
 
     Ok(found)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_stats_line_counts_healthy_organs() {
+        let stats = DoctorStats {
+            workspace: "/tmp/autonomic".into(),
+            config: "/tmp/config.toml".into(),
+            memory: "/tmp/memory".into(),
+            broker: "/tmp/broker".into(),
+            organs: vec![
+                OrganStat {
+                    alias: "brain".into(),
+                    binary: "agent-brain".into(),
+                    version: Some("0.33.0".into()),
+                    ok: true,
+                },
+                OrganStat {
+                    alias: "immune".into(),
+                    binary: "agent-immune".into(),
+                    version: None,
+                    ok: false,
+                },
+            ],
+        };
+        let line = format_stats_line(&stats);
+        assert!(line.contains("organs=1/2 healthy"));
+    }
 }

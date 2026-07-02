@@ -16,6 +16,8 @@ pub mod organ_config;
 pub mod provenance;
 pub mod workspace_sync;
 pub mod workspace_update;
+#[cfg(feature = "wasm")]
+pub mod wasm_engine;
 
 pub use context::{
     ContextBundle, RouteLimits, ScoredItem, TaskKind, WorkflowTrigger, WorkflowTriggerKind,
@@ -57,3 +59,5 @@ pub use workspace_sync::{
 };
 pub use workspace_update::{organ_alias_for_binary, should_update_binary, should_update_organ};
 pub use provenance::BrainProvenance;
+#[cfg(feature = "wasm")]
+pub use wasm_engine::{default_fuel_limit, WasmEngine};

@@ -1,15 +1,18 @@
 [package]
 name = "agent-body-core"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2024"
 
 [features]
 default = []
 nats = ["dep:async-nats"]
+wasm = ["dep:blake3", "dep:wasmtime"]
 
 [dependencies]
 anyhow = "1"
 async-nats = { version = "0.39", optional = true }
+blake3 = { version = "1", optional = true }
+wasmtime = { version = "28", optional = true }
 dirs = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

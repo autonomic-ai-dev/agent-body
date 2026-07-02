@@ -79,9 +79,18 @@ pub struct SandboxExecute {
     /// CPU core limit (fractional allowed).
     #[serde(default)]
     pub cpu_cores: Option<f32>,
-    /// Sandbox backend: `subprocess`, `firecracker`, or `docker`.
+    /// Sandbox backend: `subprocess`, `firecracker`, `wasm`, or `docker`.
     #[serde(default)]
     pub backend: Option<String>,
+    /// Path to a `.wasm` module when `backend` is `wasm`.
+    #[serde(default)]
+    pub wasm_path: Option<String>,
+    /// Instruction fuel budget for WASM execution (default: `AUTONOMIC_WASM_FUEL`).
+    #[serde(default)]
+    pub fuel_limit: Option<u64>,
+    /// Maximum WASM linear memory in bytes.
+    #[serde(default)]
+    pub memory_limit_bytes: Option<usize>,
 }
 
 /// Sandbox execution result published for agent-spine orchestration.
@@ -93,4 +102,10 @@ pub struct ExecuteResult {
     pub stdout: String,
     pub stderr: String,
     pub success: bool,
+    /// WASM instructions consumed (WASM backend only).
+    #[serde(default)]
+    pub fuel_consumed: Option<u64>,
+    /// Peak WASM linear memory bytes (WASM backend only).
+    #[serde(default)]
+    pub memory_peak_bytes: Option<usize>,
 }
