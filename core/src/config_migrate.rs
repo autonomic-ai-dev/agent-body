@@ -30,12 +30,12 @@ pub fn migrate_brain_yaml_if_needed() -> Result<bool> {
     }
 
     let content = fs::read_to_string(&legacy_path)?;
-    let json: serde_json::Value = if legacy_path.extension().and_then(|e| e.to_str()) == Some("json")
-    {
-        serde_json::from_str(&content)?
-    } else {
-        serde_yaml::from_str(&content)?
-    };
+    let json: serde_json::Value =
+        if legacy_path.extension().and_then(|e| e.to_str()) == Some("json") {
+            serde_json::from_str(&content)?
+        } else {
+            serde_yaml::from_str(&content)?
+        };
     let table: toml::Table = serde_json::from_value(json)?;
 
     let mut root: toml::Table = if unified.exists() {

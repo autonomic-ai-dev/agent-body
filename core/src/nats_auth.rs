@@ -84,15 +84,14 @@ fn organ_acl(organ: &str, user: &str, password: String) -> OrganNatsAcl {
                 js_api.clone(),
                 inbox.clone(),
             ],
-            vec![
-                "autonomic.>".into(),
-                "system.>".into(),
-                js_api,
-                inbox,
-            ],
+            vec!["autonomic.>".into(), "system.>".into(), js_api, inbox],
         ),
         "immune" => (
-            vec!["autonomic.execute.result".into(), js_api.clone(), inbox.clone()],
+            vec![
+                "autonomic.execute.result".into(),
+                js_api.clone(),
+                inbox.clone(),
+            ],
             vec!["autonomic.execute.sandbox".into(), js_api, inbox],
         ),
         "muscle" => (
@@ -107,10 +106,7 @@ fn organ_acl(organ: &str, user: &str, password: String) -> OrganNatsAcl {
             vec!["events.heart.>".into(), js_api.clone(), inbox.clone()],
             vec!["autonomic.>".into(), "events.>".into(), js_api, inbox],
         ),
-        "eyes" => (
-            vec!["events.vision.>".into(), inbox.clone()],
-            vec![inbox],
-        ),
+        "eyes" => (vec!["events.vision.>".into(), inbox.clone()], vec![inbox]),
         "mouth" => (
             vec!["events.mouth.>".into(), inbox.clone()],
             vec!["autonomic.mouth.>".into(), inbox],
@@ -119,10 +115,7 @@ fn organ_acl(organ: &str, user: &str, password: String) -> OrganNatsAcl {
             vec!["events.brain.>".into(), js_api.clone(), inbox.clone()],
             vec!["autonomic.brain.>".into(), js_api, inbox],
         ),
-        _ => (
-            vec![inbox.clone()],
-            vec![inbox],
-        ),
+        _ => (vec![inbox.clone()], vec![inbox]),
     };
     OrganNatsAcl {
         user: user.to_string(),
@@ -133,17 +126,22 @@ fn organ_acl(organ: &str, user: &str, password: String) -> OrganNatsAcl {
 }
 
 fn default_organs(_port: u16, _tls_enabled: bool) -> HashMap<String, OrganNatsAcl> {
-    ["nerves", "spine", "immune", "muscle", "heart", "eyes", "mouth", "brain"]
-        .into_iter()
-        .map(|name| {
-            let password = random_password();
-            (name.to_string(), organ_acl(name, name, password))
-        })
-        .collect()
+    [
+        "nerves", "spine", "immune", "muscle", "heart", "eyes", "mouth", "brain",
+    ]
+    .into_iter()
+    .map(|name| {
+        let password = random_password();
+        (name.to_string(), organ_acl(name, name, password))
+    })
+    .collect()
 }
 
 /// Load existing credentials or create a fresh bundle (0600 on disk).
-pub fn load_or_create_credentials(port: u16, tls_enabled: bool) -> std::io::Result<NatsCredentialBundle> {
+pub fn load_or_create_credentials(
+    port: u16,
+    tls_enabled: bool,
+) -> std::io::Result<NatsCredentialBundle> {
     let path = creds_path();
     if path.exists() {
         let raw = fs::read_to_string(&path)?;
@@ -212,8 +210,8 @@ pub fn build_nats_url(base_url: &str, user: &str, password: &str) -> String {
 /// Resolve connect URL from environment (user/password optional).
 #[must_use]
 pub fn nats_connect_url_from_env() -> String {
-    let base = std::env::var("AUTONOMIC_NATS_URL")
-        .unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let base =
+        std::env::var("AUTONOMIC_NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
     if nats_insecure_mode() {
         return base;
     }
@@ -255,12 +253,13 @@ pub fn organ_env_vars(bundle: &NatsCredentialBundle, organ: &str) -> Vec<(String
         out.push((ENV_NATS_CA.into(), tls.join("ca.pem").display().to_string()));
         out.push((
             ENV_NATS_CERT.into(),
-            tls.join(format!("client-{organ}.pem")).display().to_string(),
+            tls.join(format!("client-{organ}.pem"))
+                .display()
+                .to_string(),
         ));
         out.push((
             ENV_NATS_KEY.into(),
-            tls
-                .join(format!("client-{organ}-key.pem"))
+            tls.join(format!("client-{organ}-key.pem"))
                 .display()
                 .to_string(),
         ));
@@ -285,11 +284,7 @@ pub fn write_server_config(bundle: &NatsCredentialBundle) -> std::io::Result<Pat
     if bundle.tls_enabled {
         let tls = tls_dir();
         writeln!(file, "tls {{")?;
-        writeln!(
-            file,
-            "  cert_file: {:?}",
-            tls.join("server.pem").display()
-        )?;
+        writeln!(file, "  cert_file: {:?}", tls.join("server.pem").display())?;
         writeln!(
             file,
             "  key_file: {:?}",
@@ -355,6 +350,10 @@ mod tests {
     fn eyes_cannot_subscribe_workflow_subjects() {
         let acl = organ_acl("eyes", "eyes", "x".into());
         assert!(!acl.subscribe.iter().any(|s| s.contains("workflow")));
-        assert!(!acl.subscribe.iter().any(|s| s.contains("autonomic.execute")));
+        assert!(
+            !acl.subscribe
+                .iter()
+                .any(|s| s.contains("autonomic.execute"))
+        );
     }
 }

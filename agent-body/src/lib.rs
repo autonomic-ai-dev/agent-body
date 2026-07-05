@@ -1,6 +1,9 @@
 pub mod agents;
 pub mod config;
+pub mod degradation;
 pub mod doctor;
+pub mod github_release;
+pub mod health_mesh;
 pub mod init;
 pub mod log;
 pub mod mcp_gateway;
@@ -9,7 +12,6 @@ pub mod router;
 pub mod supervisor;
 pub mod sync_cmd;
 pub mod tui;
-pub mod github_release;
 pub mod tui_install;
 pub mod ui_relay;
 pub mod update;

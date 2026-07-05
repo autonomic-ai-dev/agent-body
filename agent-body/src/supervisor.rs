@@ -1,12 +1,17 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+use agent_body_core::memory_dir;
 use agent_body_core::organ_state_dir;
+use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
+
+use crate::degradation::DegradationState;
 use agent_body_core::ui::ProgressRun;
 
 use crate::nats_config;
@@ -86,7 +91,25 @@ pub fn start_all() -> Result<()> {
         }
     };
 
-    for spec in specs {
+    for spec in specs.iter().filter(|s| s.start_order == 0) {
+        let step = progress.step(spec.name);
+        match start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
+            Ok(pid) => match wait_for_health(spec, 15) {
+                Ok(()) => step.done(),
+                Err(e) => step.warn(format!("pid {pid} — {e:#}")),
+            },
+            Err(e) if e.to_string().contains("already running") => step.cached(),
+            Err(e) => step.fail(format!("{e:#}")),
+        }
+    }
+
+    let brain_step = progress.step("brain index");
+    match wait_for_brain_index(30) {
+        Ok(()) => brain_step.done(),
+        Err(e) => brain_step.warn(format!("{e:#} — continuing boot")),
+    }
+
+    for spec in specs.iter().filter(|s| s.start_order > 0) {
         let step = progress.step(spec.name);
         match start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
             Ok(pid) => match wait_for_health(spec, 15) {
@@ -187,9 +210,11 @@ pub fn supervise(interval_secs: u64) -> Result<()> {
 
             if !running || !healthy {
                 if running {
+                    record_restart(spec.name);
                     eprintln!("  ! {} unhealthy — restarting", spec.name);
                     stop_daemon(spec, false).ok();
                 } else {
+                    record_restart(spec.name);
                     eprintln!("  ! {} not running — starting", spec.name);
                 }
                 match start_daemon(spec, &supervisor_dir(), nats_bootstrap.as_ref()) {
@@ -206,7 +231,7 @@ pub fn supervise(interval_secs: u64) -> Result<()> {
     }
 }
 
-fn collect_status() -> Result<Vec<DaemonStatus>> {
+pub fn collect_status() -> Result<Vec<DaemonStatus>> {
     let supervisor_dir = supervisor_dir();
     let log_dir = organ_state_dir("supervisor").join("logs");
     let mut out = Vec::new();
@@ -239,7 +264,7 @@ fn write_status_snapshot() -> Result<()> {
     Ok(())
 }
 
-fn supervisor_dir() -> PathBuf {
+pub fn supervisor_dir() -> PathBuf {
     organ_state_dir("supervisor")
 }
 
@@ -362,19 +387,25 @@ fn wait_for_health(spec: &DaemonSpec, timeout_secs: u64) -> Result<()> {
     )
 }
 
-fn check_health(url: &str) -> bool {
+pub fn check_health_with_latency(url: &str) -> (bool, u64) {
     let client = match reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(2))
         .build()
     {
         Ok(c) => c,
-        Err(_) => return false,
+        Err(_) => return (false, 0),
     };
-    client
+    let start = std::time::Instant::now();
+    let ok = client
         .get(url)
         .send()
         .map(|r| r.status().is_success())
-        .unwrap_or(false)
+        .unwrap_or(false);
+    (ok, start.elapsed().as_millis() as u64)
+}
+
+fn check_health(url: &str) -> bool {
+    check_health_with_latency(url).0
 }
 
 fn binary_on_path(binary: &str) -> bool {
@@ -408,5 +439,205 @@ fn read_running_pid(path: &PathBuf) -> Result<Option<u32>> {
     } else {
         fs::remove_file(path).ok();
         Ok(None)
+    }
+}
+
+pub const EVICTION_SCORE_THRESHOLD: u8 = 30;
+const RSS_WARN_KB: u64 = 512 * 1024;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrganHealth {
+    pub name: String,
+    pub running: bool,
+    pub healthy: bool,
+    pub health_score: u8,
+    pub latency_ms: u64,
+    pub restart_count: u32,
+    pub rss_kb: u64,
+    pub should_evict: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrgansHealthReport {
+    pub timestamp: String,
+    pub mesh_score: u8,
+    pub organs: Vec<OrganHealth>,
+    pub degradation: DegradationState,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HealthScoreInput {
+    pub running: bool,
+    pub healthy: bool,
+    pub latency_ms: u64,
+    pub restart_count: u32,
+    pub rss_kb: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HealthScoreResult {
+    pub score: u8,
+    pub should_evict: bool,
+}
+
+pub fn compute_health_score(input: HealthScoreInput) -> HealthScoreResult {
+    if !input.running {
+        return HealthScoreResult {
+            score: 0,
+            should_evict: true,
+        };
+    }
+    let mut score: i32 = 100;
+    if !input.healthy {
+        score -= 50;
+    }
+    if input.latency_ms > 2000 {
+        score -= 30;
+    } else if input.latency_ms > 500 {
+        score -= 15;
+    } else if input.latency_ms > 200 {
+        score -= 5;
+    }
+    score -= (input.restart_count as i32).saturating_mul(5).min(40);
+    if input.rss_kb > RSS_WARN_KB {
+        score -= 20;
+    } else if input.rss_kb > RSS_WARN_KB / 2 {
+        score -= 10;
+    }
+    let score = score.clamp(0, 100) as u8;
+    HealthScoreResult {
+        score,
+        should_evict: score < EVICTION_SCORE_THRESHOLD,
+    }
+}
+
+pub fn read_restart_counts() -> HashMap<String, u32> {
+    let path = supervisor_dir().join("restart_counts.json");
+    if !path.exists() {
+        return HashMap::new();
+    }
+    fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn record_restart(name: &str) {
+    let mut counts = read_restart_counts();
+    *counts.entry(name.to_string()).or_insert(0) += 1;
+    let path = supervisor_dir().join("restart_counts.json");
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(
+        &path,
+        serde_json::to_string_pretty(&counts).unwrap_or_default(),
+    );
+}
+
+pub fn rss_kb_for_pid(pid: u32) -> u64 {
+    let mut sys = System::new_with_specifics(
+        RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
+    );
+    sys.refresh_processes(
+        sysinfo::ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+        true,
+    );
+    sys.process(Pid::from_u32(pid))
+        .map(|proc| proc.memory() / 1024)
+        .unwrap_or(0)
+}
+
+pub fn organ_health_from_status(status: &DaemonStatus, restarts: u32) -> OrganHealth {
+    let (healthy, latency_ms) = if status.running {
+        check_health_with_latency(&status.health_url)
+    } else {
+        (false, 0)
+    };
+    let rss_kb = status.pid.map(rss_kb_for_pid).unwrap_or(0);
+    let scored = compute_health_score(HealthScoreInput {
+        running: status.running,
+        healthy,
+        latency_ms,
+        restart_count: restarts,
+        rss_kb,
+    });
+    OrganHealth {
+        name: status.name.clone(),
+        running: status.running,
+        healthy,
+        health_score: scored.score,
+        latency_ms,
+        restart_count: restarts,
+        rss_kb,
+        should_evict: scored.should_evict,
+    }
+}
+
+pub fn build_organs_health_report() -> Result<OrgansHealthReport> {
+    let statuses = collect_status()?;
+    let restarts = read_restart_counts();
+    let organs: Vec<OrganHealth> = statuses
+        .iter()
+        .map(|s| organ_health_from_status(s, restarts.get(&s.name).copied().unwrap_or(0)))
+        .collect();
+    let mesh_score = organs.iter().map(|o| o.health_score).min().unwrap_or(0);
+    Ok(OrgansHealthReport {
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        mesh_score,
+        degradation: DegradationState::from_mesh_score(mesh_score),
+        organs,
+    })
+}
+
+pub fn wait_for_brain_index(timeout_secs: u64) -> Result<()> {
+    let db = memory_dir().join("brain.db");
+    let deadline = Duration::from_secs(timeout_secs);
+    let start = std::time::Instant::now();
+    while start.elapsed() < deadline {
+        if brain_index_ready(&db) {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(400));
+    }
+    anyhow::bail!(
+        "brain index not ready at {} within {}s",
+        db.display(),
+        timeout_secs
+    )
+}
+
+pub fn brain_index_ready(db_path: &Path) -> bool {
+    db_path.is_file()
+        && fs::metadata(db_path)
+            .map(|m| m.len() > 4096)
+            .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_score_eviction() {
+        let bad = compute_health_score(HealthScoreInput {
+            running: true,
+            healthy: false,
+            latency_ms: 2500,
+            restart_count: 8,
+            rss_kb: RSS_WARN_KB + 1,
+        });
+        assert!(bad.should_evict);
+        assert!(bad.score < EVICTION_SCORE_THRESHOLD);
+
+        let good = compute_health_score(HealthScoreInput {
+            running: true,
+            healthy: true,
+            latency_ms: 40,
+            restart_count: 0,
+            rss_kb: 50_000,
+        });
+        assert!(!good.should_evict);
+        assert!(good.score >= 80);
     }
 }

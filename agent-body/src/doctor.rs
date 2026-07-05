@@ -75,7 +75,11 @@ fn log_dir() -> PathBuf {
 
 pub async fn run(quick: bool) -> Result<()> {
     let organ_count = crate::router::ORGANS.len();
-    let total = if quick { organ_count + 2 } else { organ_count + 3 };
+    let total = if quick {
+        organ_count + 2
+    } else {
+        organ_count + 3
+    };
     let mut progress = ProgressRun::new("Autonomic health check").with_total_hint(total);
 
     agent_body_core::ensure_dirs().ok();

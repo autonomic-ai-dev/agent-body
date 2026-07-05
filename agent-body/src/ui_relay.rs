@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -157,9 +157,7 @@ fn open_dashboard(url: &str) -> Result<()> {
     let status = match std::env::consts::OS {
         "macos" => Command::new("open").arg(url).status(),
         "linux" => Command::new("xdg-open").arg(url).status(),
-        "windows" => Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .status(),
+        "windows" => Command::new("cmd").args(["/C", "start", "", url]).status(),
         other => bail!("unsupported OS for opening browser: {other}"),
     }
     .with_context(|| format!("open {url}"))?;
@@ -203,7 +201,10 @@ pub fn run(open_only: bool, force: bool) -> Result<()> {
     std::thread::sleep(std::time::Duration::from_millis(500));
     open_dashboard(DASHBOARD_URL)?;
 
-    println!("Relay repo: {UI_REPO_SLUG} (managed at {})", ui_dir().display());
+    println!(
+        "Relay repo: {UI_REPO_SLUG} (managed at {})",
+        ui_dir().display()
+    );
     println!("Press Ctrl+C to stop the local relay.");
     let status = child.wait().context("wait for bun server.js")?;
     if !status.success() {

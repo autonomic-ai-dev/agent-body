@@ -171,7 +171,8 @@ pub fn symlink_agents_md(target: &Path, link: &Path) -> Result<()> {
     if let Some(parent) = link.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::copy(target, link).with_context(|| format!("copy {} to {}", target.display(), link.display()))?;
+    fs::copy(target, link)
+        .with_context(|| format!("copy {} to {}", target.display(), link.display()))?;
     Ok(())
 }
 
@@ -187,10 +188,7 @@ pub fn install_host_agents_md_links() -> Result<Vec<PathBuf>> {
         ("gemini", home.join(".gemini/AGENTS.md")),
         (
             "antigravity",
-            home
-                .join(".gemini")
-                .join("antigravity")
-                .join("AGENTS.md"),
+            home.join(".gemini").join("antigravity").join("AGENTS.md"),
         ),
         ("vscode", home.join(".vscode/AGENTS.md")),
     ];
