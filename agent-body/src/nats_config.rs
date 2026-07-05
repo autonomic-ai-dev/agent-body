@@ -32,7 +32,10 @@ pub fn ensure_nats_security() -> Result<NatsBootstrap> {
         ensure_tls_material(&bundle)?;
     }
     let config_path = write_server_config(&bundle).map_err(|e| anyhow::anyhow!(e))?;
-    Ok(NatsBootstrap { bundle, config_path })
+    Ok(NatsBootstrap {
+        bundle,
+        config_path,
+    })
 }
 
 fn ensure_tls_material(bundle: &NatsCredentialBundle) -> Result<()> {
@@ -43,8 +46,8 @@ fn ensure_tls_material(bundle: &NatsCredentialBundle) -> Result<()> {
         return Ok(());
     }
 
-    let mut ca_params = CertificateParams::new(vec!["autonomic-ca".into()])
-        .context("create CA params")?;
+    let mut ca_params =
+        CertificateParams::new(vec!["autonomic-ca".into()]).context("create CA params")?;
     ca_params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
     let mut dn = DistinguishedName::new();
     dn.push(DnType::CommonName, "Autonomic NATS CA");
@@ -52,15 +55,10 @@ fn ensure_tls_material(bundle: &NatsCredentialBundle) -> Result<()> {
     let ca_key = KeyPair::generate().context("generate CA key")?;
     let ca_cert = ca_params.self_signed(&ca_key).context("sign CA cert")?;
     fs::write(&ca_path, ca_cert.pem()).context("write ca.pem")?;
-    fs::write(
-        dir.join("ca-key.pem"),
-        ca_key.serialize_pem(),
-    )
-    .context("write ca-key.pem")?;
+    fs::write(dir.join("ca-key.pem"), ca_key.serialize_pem()).context("write ca-key.pem")?;
 
-    let mut server_params =
-        CertificateParams::new(vec!["localhost".into(), "127.0.0.1".into()])
-            .context("create server params")?;
+    let mut server_params = CertificateParams::new(vec!["localhost".into(), "127.0.0.1".into()])
+        .context("create server params")?;
     server_params
         .subject_alt_names
         .push(SanType::IpAddress(std::net::IpAddr::V4(
@@ -74,11 +72,8 @@ fn ensure_tls_material(bundle: &NatsCredentialBundle) -> Result<()> {
         .signed_by(&server_key, &ca_cert, &ca_key)
         .context("sign server cert")?;
     fs::write(dir.join("server.pem"), server_cert.pem()).context("write server.pem")?;
-    fs::write(
-        dir.join("server-key.pem"),
-        server_key.serialize_pem(),
-    )
-    .context("write server-key.pem")?;
+    fs::write(dir.join("server-key.pem"), server_key.serialize_pem())
+        .context("write server-key.pem")?;
 
     for organ in bundle.organs.keys() {
         write_client_cert(&dir, organ, &ca_cert, &ca_key)?;
@@ -102,11 +97,7 @@ fn write_client_cert(
     let cert = params
         .signed_by(&key, ca_cert, ca_key)
         .context("sign client cert")?;
-    fs::write(
-        dir.join(format!("client-{organ}.pem")),
-        cert.pem(),
-    )
-    .context("write client cert")?;
+    fs::write(dir.join(format!("client-{organ}.pem")), cert.pem()).context("write client cert")?;
     fs::write(
         dir.join(format!("client-{organ}-key.pem")),
         key.serialize_pem(),

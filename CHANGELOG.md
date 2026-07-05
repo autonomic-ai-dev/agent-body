@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-07-05
+
+### Added
+- **Phase 8 health mesh** — per-daemon health score 0–100 (latency, restarts, RSS)
+- **`GET /organs/health`** via `autonomic serve-health` (port 3200)
+- **Degradation ladder** — mouth raw JSON / eyes DOM-only / minimal MCP gating
+- **MCP reconnect** — retry organ session once on tool call failure
+- **Boot gate** — nats → brain.db index ready → spine/nerves/heart
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

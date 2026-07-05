@@ -113,19 +113,21 @@ impl McpGateway {
         tool_name: &'static str,
         arguments: serde_json::Value,
     ) -> Result<CallToolResult, McpError> {
+        if let Ok(report) = crate::supervisor::build_organs_health_report() {
+            if !report.degradation.level.allows_organ(organ_key) {
+                return Err(McpError::internal_error(
+                    format!(
+                        "organ '{organ_key}' gated by degradation {:?} (mesh_score={})",
+                        report.degradation.level, report.mesh_score
+                    ),
+                    None,
+                ));
+            }
+        }
+
         let routes = organ_routes();
         let route = routes.get(organ_key).ok_or_else(|| {
             McpError::internal_error(format!("no route for organ '{organ_key}'"), None)
-        })?;
-
-        let mut sessions = self.sessions.lock().await;
-        if !sessions.contains_key(organ_key) {
-            let service = connect_organ(route).await?;
-            sessions.insert(organ_key, service);
-        }
-
-        let service = sessions.get(organ_key).ok_or_else(|| {
-            McpError::internal_error(format!("session vanished for organ '{organ_key}'"), None)
         })?;
 
         let mut req = CallToolRequestParams::new(tool_name.to_string());
@@ -135,9 +137,41 @@ impl McpGateway {
             }
         }
 
-        service.call_tool(req).await.map_err(|e| {
-            McpError::internal_error(format!("tool call failed: {e}"), None)
-        })
+        let first = {
+            let mut sessions = self.sessions.lock().await;
+            if !sessions.contains_key(organ_key) {
+                let service = connect_organ(route).await?;
+                sessions.insert(organ_key, service);
+            }
+            let service = sessions.get(organ_key).ok_or_else(|| {
+                McpError::internal_error(format!("session vanished for organ '{organ_key}'"), None)
+            })?;
+            service.call_tool(req.clone()).await
+        };
+
+        match first {
+            Ok(result) => Ok(result),
+            Err(first_err) => {
+                let mut sessions = self.sessions.lock().await;
+                sessions.remove(organ_key);
+                drop(sessions);
+                let mut sessions = self.sessions.lock().await;
+                let service = connect_organ(route).await?;
+                sessions.insert(organ_key, service);
+                let service = sessions.get(organ_key).ok_or_else(|| {
+                    McpError::internal_error(
+                        format!("session vanished for organ '{organ_key}'"),
+                        None,
+                    )
+                })?;
+                service.call_tool(req).await.map_err(|e| {
+                    McpError::internal_error(
+                        format!("tool call failed after reconnect: {first_err}; {e}"),
+                        None,
+                    )
+                })
+            }
+        }
     }
 
     async fn forward_params<T: serde::Serialize>(

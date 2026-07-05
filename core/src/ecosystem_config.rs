@@ -145,10 +145,7 @@ where
 
 pub fn read_organ_section_raw(organ: &str) -> Result<Option<toml::Table>> {
     let root = load_config_table()?;
-    Ok(root
-        .get(organ)
-        .and_then(|v| v.as_table())
-        .cloned())
+    Ok(root.get(organ).and_then(|v| v.as_table()).cloned())
 }
 
 pub fn write_organ_section_raw(organ: &str, section: &toml::Table) -> Result<()> {

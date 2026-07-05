@@ -16,7 +16,9 @@ where
     let _ = config_migrate::run_legacy_migrations();
     let unified = global_workspace::config_path();
 
-    if unified.exists() && let Some(cfg) = read_section(&unified, organ)? {
+    if unified.exists()
+        && let Some(cfg) = read_section(&unified, organ)?
+    {
         return Ok(cfg);
     }
 

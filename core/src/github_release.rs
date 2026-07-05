@@ -197,7 +197,9 @@ pub fn version_stamp_path(binary_path: &Path) -> PathBuf {
 
 pub fn read_installed_version(binary_path: &Path) -> Option<String> {
     let stamp = version_stamp_path(binary_path);
-    std::fs::read_to_string(stamp).ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string(stamp)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 fn write_installed_version(binary_path: &Path, tag: &str) -> Result<()> {
@@ -208,9 +210,7 @@ fn write_installed_version(binary_path: &Path, tag: &str) -> Result<()> {
 #[cfg(target_os = "macos")]
 pub fn adhoc_sign_macos(path: &Path) {
     let path_str = path.to_string_lossy();
-    let _ = Command::new("xattr")
-        .args(["-cr", &path_str])
-        .status();
+    let _ = Command::new("xattr").args(["-cr", &path_str]).status();
     let _ = Command::new("codesign")
         .args(["--force", "--sign", "-", &path_str])
         .status();
@@ -261,8 +261,7 @@ pub fn run_organ_self_update(
     current_version: &str,
     force: bool,
 ) -> Result<bool> {
-    let mut progress =
-        ProgressRun::new(format!("Updating {binary}")).with_total_hint(4);
+    let mut progress = ProgressRun::new(format!("Updating {binary}")).with_total_hint(4);
 
     let fetch = progress.step("fetch latest release");
     let latest = match fetch_latest_tag(repo, binary) {
@@ -312,12 +311,7 @@ pub fn run_organ_self_update(
     Ok(true)
 }
 
-pub fn ensure_release_binary(
-    repo: &str,
-    binary: &str,
-    dest: &Path,
-    force: bool,
-) -> Result<bool> {
+pub fn ensure_release_binary(repo: &str, binary: &str, dest: &Path, force: bool) -> Result<bool> {
     let latest = fetch_latest_tag(repo, binary)?;
     let latest_ver = latest.trim_start_matches('v');
 

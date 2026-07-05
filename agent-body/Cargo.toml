@@ -1,11 +1,12 @@
 [package]
 name = "agent-body"
-version = "0.5.17"
+version = "0.6.0"
 edition = "2021"
 
 [dependencies]
 agent-body-core = { path = "../core", features = ["nats"] }
 anyhow = "1"
+axum = "0.7"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 dirs = "5"

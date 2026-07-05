@@ -68,10 +68,7 @@ pub fn git_init(remote: Option<&str>, branch: Option<&str>) -> Result<()> {
     let _ = git(&["add", "-A"], &root);
     let status = git(&["status", "--porcelain"], &root)?;
     if !status.is_empty() {
-        let _ = git(
-            &["commit", "-m", "autonomic: workspace sync init"],
-            &root,
-        );
+        let _ = git(&["commit", "-m", "autonomic: workspace sync init"], &root);
     }
     Ok(())
 }
@@ -79,7 +76,10 @@ pub fn git_init(remote: Option<&str>, branch: Option<&str>) -> Result<()> {
 pub fn git_status() -> Result<String> {
     let root = global_workspace::autonomic_root();
     if !root.join(".git").exists() {
-        bail!("no git repo at {} — run `autonomic sync git init`", root.display());
+        bail!(
+            "no git repo at {} — run `autonomic sync git init`",
+            root.display()
+        );
     }
     git(&["status", "-sb"], &root)
 }
@@ -119,10 +119,7 @@ pub fn git_push() -> Result<()> {
     let _ = git(&["add", "-A"], &root);
     let porcelain = git(&["status", "--porcelain"], &root)?;
     if !porcelain.is_empty() {
-        let _ = git(
-            &["commit", "-m", "autonomic: workspace sync"],
-            &root,
-        );
+        let _ = git(&["commit", "-m", "autonomic: workspace sync"], &root);
     }
     let _ = git(&["push", "-u", "origin", branch], &root)?;
     Ok(())

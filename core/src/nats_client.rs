@@ -4,7 +4,9 @@
 use std::path::PathBuf;
 
 #[cfg(feature = "nats")]
-use crate::nats_auth::{ENV_NATS_CA, ENV_NATS_CERT, ENV_NATS_KEY, ENV_NATS_PASSWORD, ENV_NATS_TLS, ENV_NATS_USER};
+use crate::nats_auth::{
+    ENV_NATS_CA, ENV_NATS_CERT, ENV_NATS_KEY, ENV_NATS_PASSWORD, ENV_NATS_TLS, ENV_NATS_USER,
+};
 
 /// Connect to NATS using `AUTONOMIC_NATS_*` environment variables.
 #[cfg(feature = "nats")]

@@ -37,7 +37,10 @@ pub fn init_project(name: Option<&str>) -> Result<()> {
         let scaffold = progress.step(format!("project '{project}'"));
         let dir = PathBuf::from(&project);
         if dir.exists() {
-            scaffold.fail(format!("project directory '{}' already exists", dir.display()));
+            scaffold.fail(format!(
+                "project directory '{}' already exists",
+                dir.display()
+            ));
             progress.finish()?;
             anyhow::bail!("project directory '{}' already exists", dir.display());
         }

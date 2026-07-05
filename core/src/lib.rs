@@ -7,35 +7,35 @@ pub mod error;
 pub mod execution;
 pub mod github_release;
 pub mod global_workspace;
-pub mod ui;
 pub mod nats;
 pub mod nats_auth;
 #[cfg(feature = "nats")]
 pub mod nats_client;
 pub mod organ_config;
 pub mod provenance;
-pub mod workspace_sync;
-pub mod workspace_update;
+pub mod ui;
 #[cfg(feature = "wasm")]
 pub mod wasm_engine;
+pub mod workspace_sync;
+pub mod workspace_update;
 
-pub use context::{
-    ContextBundle, RouteLimits, ScoredItem, TaskKind, WorkflowTrigger, WorkflowTriggerKind,
-};
-pub use error::CoreError;
-pub use execution::ExecutionId;
 pub use agents_compose::{
-    compose_agents_md, default_fragment, install_host_agents_md_links, scaffold_agents_dir,
-    write_fragment, BASE_AGENT_MODE, FRAGMENT_ORDER,
+    BASE_AGENT_MODE, FRAGMENT_ORDER, compose_agents_md, default_fragment,
+    install_host_agents_md_links, scaffold_agents_dir, write_fragment,
 };
 pub use config_migrate::{
     migrate_brain_yaml_if_needed, migrate_spine_legacy_if_needed, run_legacy_migrations,
 };
-pub use ecosystem_config::{
-    agents_config, effective_sync, effective_update, ensure_default_ecosystem_sections,
-    read_organ_section_raw, update_enabled_for_organ, write_organ_section_raw, AgentsConfig,
-    GitSyncConfig, SyncConfig, UpdateConfig,
+pub use context::{
+    ContextBundle, RouteLimits, ScoredItem, TaskKind, WorkflowTrigger, WorkflowTriggerKind,
 };
+pub use ecosystem_config::{
+    AgentsConfig, GitSyncConfig, SyncConfig, UpdateConfig, agents_config, effective_sync,
+    effective_update, ensure_default_ecosystem_sections, read_organ_section_raw,
+    update_enabled_for_organ, write_organ_section_raw,
+};
+pub use error::CoreError;
+pub use execution::ExecutionId;
 pub use global_workspace::{
     agents_dir, agents_md_path, autonomic_root, broker_dir, config_path, default_state_db,
     ensure_dirs, executions_dir, legacy_brain_home, legacy_config_path, legacy_spine_config_dir,
@@ -54,10 +54,10 @@ pub use nats_auth::{
 };
 #[cfg(feature = "nats")]
 pub use nats_client::{connect_nats, ping_nats};
-pub use workspace_sync::{
-    git_init, git_pull, git_push, git_status, write_default_gitignore, DEFAULT_GITIGNORE,
-};
-pub use workspace_update::{organ_alias_for_binary, should_update_binary, should_update_organ};
 pub use provenance::BrainProvenance;
 #[cfg(feature = "wasm")]
-pub use wasm_engine::{default_fuel_limit, WasmEngine};
+pub use wasm_engine::{WasmEngine, default_fuel_limit};
+pub use workspace_sync::{
+    DEFAULT_GITIGNORE, git_init, git_pull, git_push, git_status, write_default_gitignore,
+};
+pub use workspace_update::{organ_alias_for_binary, should_update_binary, should_update_organ};
