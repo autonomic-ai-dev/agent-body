@@ -174,6 +174,8 @@ impl McpGateway {
         }
     }
 
+
+
     async fn forward_params<T: serde::Serialize>(
         &self,
         organ_key: &'static str,
@@ -184,6 +186,45 @@ impl McpGateway {
             .map_err(|e| McpError::internal_error(format!("serialize params: {e}"), None))?;
         self.forward(organ_key, tool_name, arguments).await
     }
+}
+
+
+async fn record_wasm_to_heart(result: &CallToolResult) {
+    let mut texts = Vec::new();
+    for item in &result.content {
+        if let Ok(v) = serde_json::to_value(item) {
+            if let Some(t) = v.get("text").and_then(|x| x.as_str()) {
+                texts.push(t.to_string());
+            } else if let Some(t) = v.pointer("/raw/text").and_then(|x| x.as_str()) {
+                texts.push(t.to_string());
+            }
+        }
+    }
+    let Some(blob) = texts.into_iter().find(|t| t.contains("fuel_consumed")) else {
+        return;
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&blob) else { return };
+    let fuel = value.get("fuel_consumed").and_then(|v| v.as_u64()).unwrap_or(0);
+    if fuel == 0 {
+        return;
+    }
+    let id = value
+        .get("job_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("wasm")
+        .to_string();
+    let payload = serde_json::json!({
+        "id": format!("{id}-{fuel}"),
+        "job_id": id,
+        "organ": "immune",
+        "fuel_consumed": fuel,
+        "memory_peak_bytes": value.get("memory_peak_bytes").and_then(|v| v.as_u64()),
+        "success": value.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(0) == 0,
+        "latency_ms": 0,
+    });
+    let port = std::env::var("AGENT_HEART_PORT").unwrap_or_else(|_| "3101".into());
+    let url = format!("http://127.0.0.1:{port}/budget/wasm/record");
+    let _ = reqwest::Client::new().post(url).json(&payload).send().await;
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, JsonSchema)]
@@ -417,8 +458,11 @@ impl McpGateway {
         &self,
         params: Parameters<ImmuneSandboxRunParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.forward_params("immune", "immune_sandbox_run", params.0)
-            .await
+        let result = self
+            .forward_params("immune", "immune_sandbox_run", params.0)
+            .await?;
+        record_wasm_to_heart(&result).await;
+        Ok(result)
     }
 
     #[tool(description = "Run AST-based security linting against a code snippet")]
