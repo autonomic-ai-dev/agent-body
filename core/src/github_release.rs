@@ -17,6 +17,20 @@ pub fn detect_target() -> Option<&'static str> {
     }
 }
 
+pub fn parse_semver(raw: &str) -> Option<semver::Version> {
+    let clean = raw.trim().trim_start_matches('v');
+    semver::Version::parse(clean).ok()
+}
+
+pub fn is_prerelease(raw: &str) -> bool {
+    if let Some(v) = parse_semver(raw) {
+        !v.pre.is_empty()
+    } else {
+        let lower = raw.to_lowercase();
+        lower.contains("beta") || lower.contains("alpha") || lower.contains("rc")
+    }
+}
+
 pub fn parse_version(raw: &str) -> Vec<u32> {
     raw.trim()
         .trim_start_matches('v')
@@ -26,7 +40,11 @@ pub fn parse_version(raw: &str) -> Vec<u32> {
 }
 
 pub fn version_is_newer(latest: &str, current: &str) -> bool {
-    parse_version(latest) > parse_version(current)
+    if let (Some(l), Some(c)) = (parse_semver(latest), parse_semver(current)) {
+        l > c
+    } else {
+        parse_version(latest) > parse_version(current)
+    }
 }
 
 pub fn release_artifact_name(binary: &str, target: &str) -> String {
@@ -282,6 +300,11 @@ pub fn run_organ_self_update(
     let current_ver = current_version.trim_start_matches('v');
 
     let compare = progress.step("compare versions");
+    if !force && is_prerelease(latest_ver) && !is_prerelease(current_ver) {
+        compare.cached();
+        progress.finish()?;
+        return Ok(false);
+    }
     if !force && !version_is_newer(latest_ver, current_ver) {
         compare.cached();
         progress.finish()?;
@@ -320,6 +343,9 @@ pub fn ensure_release_binary(repo: &str, binary: &str, dest: &Path, force: bool)
     if dest.is_file() {
         if let Some(current) = read_installed_version(dest) {
             let current_ver = current.trim_start_matches('v');
+            if !force && is_prerelease(latest_ver) && !is_prerelease(current_ver) {
+                return Ok(false);
+            }
             if !force && !version_is_newer(latest_ver, current_ver) {
                 return Ok(false);
             }
@@ -349,5 +375,18 @@ mod tests {
     fn version_compare() {
         assert!(version_is_newer("0.5.2", "0.5.1"));
         assert!(!version_is_newer("0.5.1", "0.5.2"));
+        assert!(version_is_newer("1.0.0-beta.2", "1.0.0-beta.1"));
+        assert!(!version_is_newer("1.0.0-beta.1", "1.0.0-beta.2"));
+        assert!(version_is_newer("1.0.0", "1.0.0-beta.1"));
+        assert!(!version_is_newer("1.0.0-beta.1", "1.0.0"));
+    }
+
+    #[test]
+    fn prerelease_detection() {
+        assert!(is_prerelease("1.0.0-beta.1"));
+        assert!(is_prerelease("v1.0.0-rc.2"));
+        assert!(is_prerelease("0.1.0-alpha"));
+        assert!(!is_prerelease("1.0.0"));
+        assert!(!is_prerelease("v0.6.1"));
     }
 }

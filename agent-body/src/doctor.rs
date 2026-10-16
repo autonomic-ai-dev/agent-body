@@ -6,6 +6,20 @@ use agent_body_core::ui::ProgressRun;
 use anyhow::Result;
 use serde::Serialize;
 
+pub const MIN_COMPATIBLE_VERSION: &str = "1.0.0-beta.1";
+
+pub fn is_version_compatible(version_str: &str) -> bool {
+    let raw = version_str.split_whitespace().last().unwrap_or(version_str);
+    if let (Some(installed), Some(min_req)) = (
+        agent_body_core::github_release::parse_semver(raw),
+        agent_body_core::github_release::parse_semver(MIN_COMPATIBLE_VERSION),
+    ) {
+        installed >= min_req
+    } else {
+        false
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct DoctorStats {
     pub workspace: String,
@@ -21,6 +35,8 @@ pub struct OrganStat {
     pub binary: String,
     pub version: Option<String>,
     pub ok: bool,
+    #[serde(default)]
+    pub compatible: bool,
 }
 
 pub async fn run_stats(json: bool) -> Result<()> {
@@ -29,17 +45,22 @@ pub async fn run_stats(json: bool) -> Result<()> {
     let mut organs = Vec::new();
     for (alias, binary) in crate::router::ORGANS {
         match check_binary(binary).await {
-            Ok(version) => organs.push(OrganStat {
-                alias: (*alias).to_string(),
-                binary: (*binary).to_string(),
-                version: Some(version),
-                ok: true,
-            }),
+            Ok(version) => {
+                let compatible = is_version_compatible(&version);
+                organs.push(OrganStat {
+                    alias: (*alias).to_string(),
+                    binary: (*binary).to_string(),
+                    version: Some(version),
+                    ok: true,
+                    compatible,
+                });
+            }
             Err(_) => organs.push(OrganStat {
                 alias: (*alias).to_string(),
                 binary: (*binary).to_string(),
                 version: None,
                 ok: false,
+                compatible: false,
             }),
         }
     }
@@ -106,7 +127,13 @@ pub async fn run(quick: bool) -> Result<()> {
     for (alias, binary) in crate::router::ORGANS {
         let step = progress.step(format!("{alias}"));
         match check_binary(binary).await {
-            Ok(_version) => step.done(),
+            Ok(version) => {
+                if is_version_compatible(&version) {
+                    step.done();
+                } else {
+                    step.warn(format!("{version} (< {MIN_COMPATIBLE_VERSION})"));
+                }
+            }
             Err(e) => {
                 step.fail(e.to_string());
                 all_healthy = false;
@@ -151,7 +178,14 @@ pub async fn check_all() -> Result<bool> {
 
     for (alias, binary) in crate::router::ORGANS {
         match check_binary(binary).await {
-            Ok(version) => println!("  ✓ {alias} ({binary}) — {version}"),
+            Ok(version) => {
+                let compat_note = if is_version_compatible(&version) {
+                    String::new()
+                } else {
+                    format!(" [incompatible: expected >= {}]", MIN_COMPATIBLE_VERSION)
+                };
+                println!("  ✓ {alias} ({binary}) — {version}{compat_note}");
+            }
             Err(e) => {
                 println!("  ✗ {alias} ({binary}) — {e}");
                 all_healthy = false;
@@ -278,16 +312,28 @@ mod tests {
                     binary: "agent-brain".into(),
                     version: Some("0.33.0".into()),
                     ok: true,
+                    compatible: false,
                 },
                 OrganStat {
                     alias: "immune".into(),
                     binary: "agent-immune".into(),
                     version: None,
                     ok: false,
+                    compatible: false,
                 },
             ],
         };
         let line = format_stats_line(&stats);
         assert!(line.contains("organs=1/2 healthy"));
+    }
+
+    #[test]
+    fn compatibility_matrix() {
+        assert!(is_version_compatible("1.0.0-beta.1"));
+        assert!(is_version_compatible("agent-spine 1.0.0-beta.1"));
+        assert!(is_version_compatible("agent-brain 1.0.0-beta.2"));
+        assert!(is_version_compatible("agent-muscle 1.0.0"));
+        assert!(!is_version_compatible("agent-body 0.6.1"));
+        assert!(!is_version_compatible("0.5.17"));
     }
 }
