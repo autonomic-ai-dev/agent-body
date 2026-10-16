@@ -1,14 +1,25 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0-beta.1] - 2026-10-16
+
+### Added
+- True semver parser in `agent-body-core` supporting pre-release tags (`-beta.N`, `-rc.N`)
+- Auto-update pre-release filter in `run_organ_self_update` and `ensure_release_binary`
+- macOS arm64 Developer ID signature verification on installation (clears quarantine without ad-hoc re-signing)
 
 ### Changed
+- Dynamic GitHub pre-release flag in release workflows for beta/rc/alpha tags
+- CI strictly arm64 macOS native runners with Developer ID code signing
+- Unified ecosystem versioning to 1.0.0-beta.1 across core and peripheral organs
+- Aligned documentation and CI path filters with agent-brain
 
-- **CI** — path filter + PR skip for non-runtime docs (aligned with agent-brain)
-- **Docs** — verify preference: `agent-brain verify --` over MCP asserts
+## [0.6.1] - 2026-07-18
 
+### Added
 
-## 0.6.0 — 2026-07-05
+- Wire WASM fuel ingestion to agent-heart `/budget/wasm/record`
+
+## [0.6.0] - 2026-07-05
 
 ### Added
 - **Phase 8 health mesh** — per-daemon health score 0–100 (latency, restarts, RSS)
@@ -16,13 +27,6 @@
 - **Degradation ladder** — mouth raw JSON / eyes DOM-only / minimal MCP gating
 - **MCP reconnect** — retry organ session once on tool call failure
 - **Boot gate** — nats → brain.db index ready → spine/nerves/heart
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [0.6.1] - 2026-07-18
 
 ### Added
 

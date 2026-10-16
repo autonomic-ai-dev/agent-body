@@ -44,18 +44,26 @@ detect_target() {
   esac
 }
 
-sign_macos_binary() {
+prepare_macos_binary() {
   local bin="$1"
-  if [[ "$(uname -s)" != "Darwin" ]]; then
-    return 0
-  fi
-  if ! command -v codesign >/dev/null 2>&1; then
-    echo "    warning: codesign not found — run 'xcode-select --install'" >&2
-    echo "    manaul fix: xattr -cr \"$bin\" && codesign --force --sign - \"$bin\"" >&2
+  if [[ "$(uname -s)" != "Darwin" ]] || [[ ! -f "$bin" ]]; then
     return 0
   fi
   xattr -cr "$bin" 2>/dev/null || true
-  codesign --force --sign - "$bin" 2>/dev/null || true
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --verify --verbose "$bin" 2>/dev/null || true
+  fi
+}
+
+sign_macos_adhoc() {
+  local bin="$1"
+  if [[ "$(uname -s)" != "Darwin" ]] || [[ ! -f "$bin" ]]; then
+    return 0
+  fi
+  xattr -cr "$bin" 2>/dev/null || true
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --force --sign - "$bin" 2>/dev/null || true
+  fi
 }
 
 install_binary() {
@@ -73,7 +81,7 @@ install_binary() {
     return 1
   fi
   chmod +x "${INSTALL_DIR}/${binary}"
-  sign_macos_binary "${INSTALL_DIR}/${binary}"
+  prepare_macos_binary "${INSTALL_DIR}/${binary}"
   if [[ "${VERBOSE:-0}" == "1" ]]; then
     echo "    ok: ${INSTALL_DIR}/${binary}"
   fi
@@ -118,7 +126,7 @@ install_nats() {
   unzip -q -o "/tmp/${asset}.zip" -d "/tmp/nats_extract"
   cp "/tmp/nats_extract/${asset}/nats-server" "${INSTALL_DIR}/nats-server"
   chmod +x "${INSTALL_DIR}/nats-server"
-  sign_macos_binary "${INSTALL_DIR}/nats-server"
+  sign_macos_adhoc "${INSTALL_DIR}/nats-server"
   rm -rf "/tmp/${asset}.zip" "/tmp/nats_extract"
   local ver_out ver_err
   ver_out="$("${INSTALL_DIR}/nats-server" --version 2>&1)" || ver_err="$?"

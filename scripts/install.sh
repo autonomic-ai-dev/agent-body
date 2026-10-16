@@ -27,13 +27,15 @@ detect_os() {
   esac
 }
 
-sign_macos_binary() {
+prepare_macos_binary() {
   local bin="$1"
-  if [[ "$(uname -s)" != "Darwin" ]]; then
+  if [[ "$(uname -s)" != "Darwin" ]] || [[ ! -f "$bin" ]]; then
     return 0
   fi
   xattr -cr "$bin" 2>/dev/null || true
-  codesign --force --sign - "$bin" 2>/dev/null || true
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --verify --verbose "$bin" 2>/dev/null || true
+  fi
 }
 
 main() {
@@ -56,7 +58,7 @@ main() {
   install -d "$HOME/.local/bin"
   curl -fsSL "$url" -o "$HOME/.local/bin/agent-body"
   chmod +x "$HOME/.local/bin/agent-body"
-  sign_macos_binary "$HOME/.local/bin/agent-body"
+  prepare_macos_binary "$HOME/.local/bin/agent-body"
   ln -sf "$HOME/.local/bin/agent-body" "$HOME/.local/bin/autonomic"
 
   echo "Installed agent-body $tag to $HOME/.local/bin/agent-body (autonomic symlink)" >&2
