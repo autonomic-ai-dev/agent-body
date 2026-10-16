@@ -10,12 +10,9 @@ use std::os::unix::fs::PermissionsExt;
 pub fn detect_target() -> Option<&'static str> {
     let os = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
+    // Release artifacts are strictly arm64 darwin (Developer ID–signed at build).
     match (os, arch) {
         ("macos", "aarch64") => Some("aarch64-apple-darwin"),
-        ("macos", "x86_64") => Some("x86_64-apple-darwin"),
-        ("linux", "x86_64") => Some("x86_64-unknown-linux-gnu"),
-        ("linux", "aarch64") => Some("aarch64-unknown-linux-gnu"),
-        ("windows", "x86_64") => Some("x86_64-pc-windows-msvc"),
         _ => None,
     }
 }
@@ -208,21 +205,26 @@ fn write_installed_version(binary_path: &Path, tag: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-pub fn adhoc_sign_macos(path: &Path) {
+pub fn prepare_macos_binary(path: &Path) {
     let path_str = path.to_string_lossy();
     let _ = Command::new("xattr").args(["-cr", &path_str]).status();
     let _ = Command::new("codesign")
-        .args(["--force", "--sign", "-", &path_str])
+        .args(["--verify", "--verbose", &path_str])
         .status();
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn adhoc_sign_macos(_path: &Path) {}
+pub fn prepare_macos_binary(_path: &Path) {}
+
+#[deprecated(note = "use prepare_macos_binary — release binaries are Developer ID-signed in CI and should not be adhoc re-signed")]
+pub fn adhoc_sign_macos(path: &Path) {
+    prepare_macos_binary(path);
+}
 
 pub fn download_release_binary(repo: &str, binary: &str, dest: &Path, tag: &str) -> Result<()> {
     let Some(target) = detect_target() else {
         bail!(
-            "unsupported platform: {}-{}",
+            "unsupported platform: {}-{} (release binaries are strictly aarch64-apple-darwin)",
             std::env::consts::OS,
             std::env::consts::ARCH
         );
@@ -251,7 +253,7 @@ pub fn download_release_binary(repo: &str, binary: &str, dest: &Path, tag: &str)
 
     std::fs::rename(&tmp, dest).context("install binary")?;
     write_installed_version(dest, tag)?;
-    adhoc_sign_macos(dest);
+    prepare_macos_binary(dest);
     Ok(())
 }
 
@@ -304,7 +306,7 @@ pub fn run_organ_self_update(
         progress.finish()?;
         return Err(err);
     }
-    adhoc_sign_macos(&exe);
+    prepare_macos_binary(&exe);
     install.done();
 
     progress.finish()?;
