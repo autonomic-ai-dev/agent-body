@@ -5,6 +5,7 @@ pub mod doctor;
 pub mod github_release;
 pub mod health_mesh;
 pub mod init;
+pub mod install;
 pub mod log;
 pub mod mcp_gateway;
 pub mod nats_config;
