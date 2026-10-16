@@ -3,9 +3,7 @@
 set -euo pipefail
 
 REPO="autonomic-ai-dev/agent-body"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/github.sh
-source "${SCRIPT_DIR}/lib/github.sh"
+VERSION="${VERSION:-v1.0.0-beta.1}"
 
 detect_arch() {
   local arch
@@ -39,29 +37,28 @@ prepare_macos_binary() {
 }
 
 main() {
-  local os arch asset tag url target
+  local os arch asset url target
   os="$(detect_os)"
   arch="$(detect_arch)"
   asset="agent-body-${arch}-${os}"
   target="${arch}-${os}"
 
-  echo "Fetching latest release for $os/$arch ..." >&2
-  tag="$(github_latest_tag "$REPO" "agent-body" "$target")"
-  if [[ -z "$tag" ]]; then
-    echo "Failed to fetch latest tag for $REPO" >&2
-    echo "Set GITHUB_TOKEN or GH_TOKEN if GitHub API rate-limits you." >&2
-    exit 1
+  if [[ "$VERSION" == "latest" ]]; then
+    url="https://github.com/$REPO/releases/latest/download/$asset"
+    echo "Downloading latest $asset ..." >&2
+  else
+    url="https://github.com/$REPO/releases/download/$VERSION/$asset"
+    echo "Downloading $asset ($VERSION) ..." >&2
   fi
-  url="https://github.com/$REPO/releases/download/$tag/$asset"
 
-  echo "Downloading $asset ($tag) ..." >&2
-  install -d "$HOME/.local/bin"
-  curl -fsSL "$url" -o "$HOME/.local/bin/agent-body"
-  chmod +x "$HOME/.local/bin/agent-body"
-  prepare_macos_binary "$HOME/.local/bin/agent-body"
-  ln -sf "$HOME/.local/bin/agent-body" "$HOME/.local/bin/autonomic"
+  INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+  install -d "$INSTALL_DIR"
+  curl -fsSL "$url" -o "$INSTALL_DIR/agent-body"
+  chmod +x "$INSTALL_DIR/agent-body"
+  prepare_macos_binary "$INSTALL_DIR/agent-body"
+  ln -sf "$INSTALL_DIR/agent-body" "$INSTALL_DIR/autonomic"
 
-  echo "Installed agent-body $tag to $HOME/.local/bin/agent-body (autonomic symlink)" >&2
+  echo "Installed agent-body to $INSTALL_DIR/agent-body (autonomic symlink)" >&2
 }
 
 main "$@"
