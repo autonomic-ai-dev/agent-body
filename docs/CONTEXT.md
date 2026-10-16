@@ -122,7 +122,7 @@ Every repository in `autonomic-ai-dev` implements a discrete cloud-native role:
 - **Key MCP Tools:**
   - `route_task`: Primary turn routing tool (budgeted context, skills, rules, memory).
   - `store_memory` / `list_memory` / `delete_memory`: Long-term fact persistence.
-  - `record_verify_outcome`: Records test/build verification results.
+  - Prefer `agent-brain verify --` over MCP `record_verify_outcome` (MCP exits not trusted for learning).
   - `file_summary` / `read_file_head` / `read_file_tail` / `grep_search`: Bounded file inspection (unlocks native Read/StrReplace).
 - **Key CLI Verbs:**
   - `agent-brain serve`: Run stdio MCP server.
@@ -530,7 +530,7 @@ When an AI agent operates within an Autonomic-enabled environment, it must follo
 2. **File Inspection (Anti-Bloat):** Prefer `file_summary`, `read_file_head`, `read_file_tail`, or `grep_search` over reading massive files directly. Scouting a path automatically unlocks native `read_file` / `replace_file_content` for that path for 1 hour.
 3. **No Ad-Hoc Python Shell Scripts:** Do not run `python -c`, heredocs, or piped scripts to inspect files or bypass edit tools. Use native tools or project test suites.
 4. **Delegate Workflows:** For multi-step procedures (e.g. migration + deploy + QA), submit a DAG workflow via `agent-spine` (`spine_submit_workflow`).
-5. **Verify Outcomes:** Record test execution results via `agent-brain verify -- <cmd>` or MCP `record_verify_outcome`.
+5. **Verify Outcomes:** Prefer `agent-brain verify -- <cmd>` (orchestrators: `--source orchestrator`). Do not rely on MCP `record_verify_outcome` for learning credit.
 6. **Turn End (Memory Persistence):** At the conclusion of a milestone, call `store_memory` with a concise summary (max 50 words). If the MCP socket fails, write via CLI fallback: `autonomic brain memory put --topic ... --fact ...`.
 
 ---

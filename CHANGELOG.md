@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **CI** — path filter + PR skip for non-runtime docs (aligned with agent-brain)
+- **Docs** — verify preference: `agent-brain verify --` over MCP asserts
+
+
 ## 0.6.0 — 2026-07-05
 
 ### Added
