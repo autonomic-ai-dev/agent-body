@@ -93,6 +93,38 @@ pub struct McpGateway {
     sessions: Arc<Mutex<HashMap<&'static str, RunningService<RoleClient, ()>>>>,
 }
 
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+
+async fn first_stdin_line(
+    stdin: &mut BufReader<tokio::io::Stdin>,
+    stdout: &mut tokio::io::Stdout,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    loop {
+        let mut line = String::new();
+        let n = stdin.read_line(&mut line).await?;
+        if n == 0 {
+            return Ok(None);
+        }
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+            if val.get("method").and_then(|m| m.as_str()) == Some("server/discover") {
+                let id = val.get("id").cloned().unwrap_or(serde_json::json!(1));
+                let resp = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": {
+                        "code": -32601,
+                        "message": "Method not found: server/discover"
+                    }
+                });
+                stdout.write_all(format!("{}\n", resp).as_bytes()).await?;
+                stdout.flush().await?;
+                continue;
+            }
+        }
+        return Ok(Some(line.into_bytes()));
+    }
+}
+
 impl McpGateway {
     pub fn new() -> Self {
         McpGateway {
@@ -102,7 +134,14 @@ impl McpGateway {
 
     pub async fn run() -> anyhow::Result<()> {
         let server = McpGateway::new();
-        let service = server.serve(rmcp::transport::io::stdio()).await?;
+        let mut stdin = BufReader::new(tokio::io::stdin());
+        let mut stdout = tokio::io::stdout();
+        let initial_line = match first_stdin_line(&mut stdin, &mut stdout).await? {
+            Some(line) => line,
+            None => return Ok(()),
+        };
+        let combined_reader = std::io::Cursor::new(initial_line).chain(stdin);
+        let service = server.serve((combined_reader, stdout)).await?;
         service.waiting().await?;
         Ok(())
     }
