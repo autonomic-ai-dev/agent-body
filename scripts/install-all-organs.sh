@@ -3,9 +3,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/github.sh
-source "${SCRIPT_DIR}/lib/github.sh"
+VERSION="${VERSION:-v1.0.0-beta.1}"
 REPOS=(
   "autonomic-ai-dev/agent-body:agent-body"
   "autonomic-ai-dev/agent-brain:agent-brain"
@@ -16,6 +14,7 @@ REPOS=(
   "autonomic-ai-dev/agent-immune:agent-immune"
   "autonomic-ai-dev/agent-eyes:agent-eyes"
   "autonomic-ai-dev/agent-mouth:agent-mouth"
+  "autonomic-ai-dev/agent-tui:agent-tui"
 )
 
 detect_target() {
@@ -71,7 +70,12 @@ install_binary() {
   local binary="$2"
   local target="$3"
   local asset="${binary}-${target}"
-  local url="https://github.com/${repo}/releases/latest/download/${asset}"
+  local url
+  if [[ "$VERSION" == "latest" ]]; then
+    url="https://github.com/${repo}/releases/latest/download/${asset}"
+  else
+    url="https://github.com/${repo}/releases/download/${VERSION}/${asset}"
+  fi
 
   if [[ "${VERBOSE:-0}" == "1" ]]; then
     echo "==> Installing ${binary} (${target})"
