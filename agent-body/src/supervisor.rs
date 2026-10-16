@@ -65,6 +65,13 @@ const DAEMONS: &[DaemonSpec] = &[
         health_url: "http://127.0.0.1:3101/health",
         start_order: 3,
     },
+    DaemonSpec {
+        name: "brain",
+        binary: "agent-brain",
+        args: &["serve", "--daemon", "--health-addr", "127.0.0.1:3201"],
+        health_url: "http://127.0.0.1:3201/health",
+        start_order: 4,
+    },
 ];
 
 pub fn start_all() -> Result<()> {
