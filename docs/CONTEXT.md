@@ -1,7 +1,7 @@
 # Autonomic AI Ecosystem: Comprehensive Architectural & Operational Context
 
 > **The Kubernetes for AI Agents** — Complete architectural deep dive, component taxonomy, cross-daemon protocols, and operational reference for `agent-body` and the entire Autonomic AI cluster.  
-> **Target Version:** v0.39.0+ ecosystem baseline  
+> **Target Version:** v1.0.0-beta.1+ ecosystem baseline  
 > **Workspace Root:** `~/.autonomic/` (`config.toml`, `memory/`, `broker/`, `state/`, `logs/`, `agents/`)
 
 ---
@@ -83,7 +83,7 @@ Every repository in `autonomic-ai-dev` implements a discrete cloud-native role:
 │ agent-eyes        │ Observability     │ agent-eyes (:3105)     │ DOM & Visual QA       │
 │ agent-mouth       │ Ingress Gateway   │ agent-mouth (:3104)    │ AST Safety & Approvals│
 │ agent-tui         │ Terminal UI       │ agent-tui              │ Terminal Dashboard    │
-│ agent-ui          │ Web Console       │ Web App (:5173 relay)  │ Ecosystem Monitor     │
+│ agent-ci-dashboard│ Telemetry Console │ Web App (:5173/Vercel) │ CI/CD Mission Control │
 │ agent-benchmarks  │ Conformance Suite │ pytest / cargo         │ Conformance & SLAs    │
 └───────────────────┴───────────────────┴────────────────────────┴───────────────────────┘
 ```
@@ -98,15 +98,20 @@ Every repository in `autonomic-ai-dev` implements a discrete cloud-native role:
   - `router.rs`: Transparent command router dispatching `autonomic <organ>` commands with auto-injected `--config ~/.autonomic/config.toml`.
   - `init.rs`: Workspace scaffolding for `~/.autonomic/`.
   - `agents.rs`: Aggregates modular prompt fragments in `~/.autonomic/agents/` into a single `~/.autonomic/AGENTS.md` and symlinks it to all installed IDEs.
-  - `doctor.rs`: Comprehensive pre-flight health audit verifying binaries on `$PATH`, port bindings, codesign certificates, and error logs.
+  - `doctor.rs`: Comprehensive pre-flight health audit verifying:
+    - Binaries on `$PATH` and executable readiness.
+    - Ecosystem version compatibility matrix enforcing `MIN_COMPATIBLE_VERSION = "1.0.0-beta.1"`.
+    - Darwin arm64 code signatures and quarantine clearing (`prepare_macos_binary`: `xattr -cr` and `codesign --verify --verbose=2`, preserving Apple Developer ID signatures and strictly avoiding ad-hoc re-signing).
+    - Port bindings and socket listeners (`:4222`, `:3001`, `:3101`-`:3106`, `:3200`).
+    - Database schemas, advisory serve locks, and fallback memory queues.
 - **Key CLI Verbs:**
   - `autonomic init [--name <proj>]`: Initialize workspace and scaffold config.
   - `autonomic start | stop | restart | supervise`: Supervisor lifecycle commands.
-  - `autonomic doctor [--quick] [--stats]`: System-wide audit.
+  - `autonomic doctor [--quick] [--stats]`: System-wide audit enforcing `1.0.0-beta.1` compatibility baseline.
   - `autonomic status`: Real-time PID, health, and port allocation table.
   - `autonomic serve-mcp`: Start aggregated stdio MCP gateway.
   - `autonomic serve-health`: Expose HTTP health mesh on port `3200`.
-  - `autonomic update [--force]`: Pull latest binary releases from GitHub.
+  - `autonomic update [--force]`: Pull latest binary releases from GitHub. Enforces semantic pre-release isolation (`is_prerelease()` check prevents stable installs from automatically jumping to pre-releases and vice-versa, unless `--force` is specified).
 
 ---
 

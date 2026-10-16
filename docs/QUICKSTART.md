@@ -31,7 +31,7 @@ autonomic init
 autonomic doctor
 ```
 
-You should see 9/9 organs installed. If any are missing, the install script
+You should see all 11 organs installed and verified against the `v1.0.0-beta.1` compatibility baseline. If any are missing, the install script
 will tell you which `curl` command to run manually.
 
 ---
