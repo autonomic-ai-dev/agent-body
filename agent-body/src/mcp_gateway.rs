@@ -213,8 +213,6 @@ impl McpGateway {
         }
     }
 
-
-
     async fn forward_params<T: serde::Serialize>(
         &self,
         organ_key: &'static str,
@@ -226,7 +224,6 @@ impl McpGateway {
         self.forward(organ_key, tool_name, arguments).await
     }
 }
-
 
 async fn record_wasm_to_heart(result: &CallToolResult) {
     let mut texts = Vec::new();
@@ -242,8 +239,13 @@ async fn record_wasm_to_heart(result: &CallToolResult) {
     let Some(blob) = texts.into_iter().find(|t| t.contains("fuel_consumed")) else {
         return;
     };
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(&blob) else { return };
-    let fuel = value.get("fuel_consumed").and_then(|v| v.as_u64()).unwrap_or(0);
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&blob) else {
+        return;
+    };
+    let fuel = value
+        .get("fuel_consumed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     if fuel == 0 {
         return;
     }

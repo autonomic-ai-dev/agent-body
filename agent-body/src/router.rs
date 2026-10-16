@@ -28,6 +28,7 @@ pub const BUILTIN_COMMANDS: &[&str] = &[
     "top",
     "tui",
     "ui",
+    "install",
     "serve-mcp",
     "help",
     "--help",

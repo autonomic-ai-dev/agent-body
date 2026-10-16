@@ -139,6 +139,56 @@ enum Commands {
         #[arg(short, long)]
         force: bool,
     },
+    /// Configure agent-body MCP gateway for an editor or agent host
+    Install {
+        /// Target host: cursor, claude-desktop, vscode, claude-code, opencode, codex, gemini, antigravity, or all
+        #[arg(value_name = "HOST")]
+        host: Option<String>,
+
+        /// Configure for all supported agent hosts
+        #[arg(long)]
+        all: bool,
+
+        /// Install to global/user configuration (default: true)
+        #[arg(long, default_value_t = true)]
+        global: bool,
+
+        /// Configure for Cursor
+        #[arg(long)]
+        cursor: bool,
+
+        /// Configure for Claude Desktop
+        #[arg(long)]
+        claude_desktop: bool,
+
+        /// Configure for VS Code
+        #[arg(long)]
+        vscode: bool,
+
+        /// Configure for Claude Code
+        #[arg(long)]
+        claude_code: bool,
+
+        /// Configure for OpenCode
+        #[arg(long)]
+        opencode: bool,
+
+        /// Configure for Codex
+        #[arg(long)]
+        codex: bool,
+
+        /// Configure for Gemini CLI
+        #[arg(long)]
+        gemini: bool,
+
+        /// Configure for Google Antigravity
+        #[arg(long)]
+        antigravity: bool,
+
+        /// Print JSON configuration without modifying files
+        #[arg(long)]
+        print_only: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -210,6 +260,35 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Tui { force }) => agent_body::tui_install::run(force)?,
         Some(Commands::Ui { open_only, force }) => agent_body::ui_relay::run(open_only, force)?,
+        Some(Commands::Install {
+            host,
+            all,
+            global,
+            cursor,
+            claude_desktop,
+            vscode,
+            claude_code,
+            opencode,
+            codex,
+            gemini,
+            antigravity,
+            print_only,
+        }) => {
+            let target = agent_body::install::HostTarget::parse(
+                host.as_deref(),
+                all,
+                global,
+                cursor,
+                claude_desktop,
+                vscode,
+                claude_code,
+                opencode,
+                codex,
+                gemini,
+                antigravity,
+            );
+            agent_body::install::run(target, print_only)?;
+        }
         Some(Commands::ServeMcp) => rt.block_on(agent_body::mcp_gateway::McpGateway::run())?,
         Some(Commands::ServeHealth { port }) => {
             rt.block_on(agent_body::health_mesh::serve(port))?

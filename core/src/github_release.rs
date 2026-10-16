@@ -234,7 +234,9 @@ pub fn prepare_macos_binary(path: &Path) {
 #[cfg(not(target_os = "macos"))]
 pub fn prepare_macos_binary(_path: &Path) {}
 
-#[deprecated(note = "use prepare_macos_binary — release binaries are Developer ID-signed in CI and should not be adhoc re-signed")]
+#[deprecated(
+    note = "use prepare_macos_binary — release binaries are Developer ID-signed in CI and should not be adhoc re-signed"
+)]
 pub fn adhoc_sign_macos(path: &Path) {
     prepare_macos_binary(path);
 }
