@@ -3,7 +3,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
-VERSION="${VERSION:-v1.0.0-beta.1}"
+VERSION="${VERSION:-v1.0.0-beta.3}"
 REPOS=(
   "autonomic-ai-dev/agent-body:agent-body"
   "autonomic-ai-dev/agent-brain:agent-brain"
@@ -65,20 +65,47 @@ sign_macos_adhoc() {
   fi
 }
 
+resolve_organ_version() {
+  local repo="$1"
+  local baseline="$2"
+  if [[ "$baseline" == "latest" ]]; then
+    echo "latest"
+    return
+  fi
+  if command -v gh >/dev/null 2>&1; then
+    local matched
+    matched="$(gh release list -R "${repo}" --limit 10 --json tagName -q ".[].tagName | select(startswith(\"${baseline}\"))" 2>/dev/null | head -n1 || true)"
+    if [[ -n "$matched" ]]; then
+      echo "$matched"
+      return
+    fi
+  fi
+  local api_url="https://api.github.com/repos/${repo}/releases?per_page=10"
+  local tag
+  tag="$(curl -fsSL "$api_url" 2>/dev/null | grep -o "\"tag_name\": \"${baseline}[^\"]*\"" | head -n1 | cut -d'"' -f4 || true)"
+  if [[ -n "$tag" ]]; then
+    echo "$tag"
+    return
+  fi
+  echo "$baseline"
+}
+
 install_binary() {
   local repo="$1"
   local binary="$2"
   local target="$3"
   local asset="${binary}-${target}"
+  local resolved_version
+  resolved_version="$(resolve_organ_version "$repo" "$VERSION")"
   local url
-  if [[ "$VERSION" == "latest" ]]; then
+  if [[ "$resolved_version" == "latest" ]]; then
     url="https://github.com/${repo}/releases/latest/download/${asset}"
   else
-    url="https://github.com/${repo}/releases/download/${VERSION}/${asset}"
+    url="https://github.com/${repo}/releases/download/${resolved_version}/${asset}"
   fi
 
   if [[ "${VERBOSE:-0}" == "1" ]]; then
-    echo "==> Installing ${binary} (${target})"
+    echo "==> Installing ${binary} (${target}) [${resolved_version}]"
   fi
   if ! curl -fsSL "$url" -o "${INSTALL_DIR}/${binary}"; then
     echo "    failed: ${url}" >&2
@@ -181,9 +208,9 @@ install_integration_packages() {
     echo "    Installing global MCP hooks and permissions for all editors..."
     "${INSTALL_DIR}/agent-brain" install --all --global || true
     echo "    Installing @supervisor package..."
-    "${INSTALL_DIR}/agent-brain" add @supervisor || true
+    "${INSTALL_DIR}/agent-brain" package add @supervisor 2>/dev/null || "${INSTALL_DIR}/agent-brain" add @supervisor || true
     echo "    Installing @starter package..."
-    "${INSTALL_DIR}/agent-brain" add @starter || true
+    "${INSTALL_DIR}/agent-brain" package add @starter 2>/dev/null || "${INSTALL_DIR}/agent-brain" add @starter || true
   fi
 }
 
@@ -252,4 +279,6 @@ main() {
   echo "  AUTONOMIC_SMOKE_HTTP=1 bash scripts/smoke-integration.sh"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
