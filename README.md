@@ -159,7 +159,7 @@ export PATH="$HOME/.local/bin:$PATH"
 curl -fsSL https://raw.githubusercontent.com/autonomic-ai-dev/agent-body/master/scripts/install.sh | bash
 ```
 
-See [config.full.example.toml](docs/config.full.example.toml) for integrated `~/.autonomic/config.toml` samples per organ.
+See the [Supervision Guide](https://autonomic-ai.dev/docs/supervision) for integrated `~/.autonomic/config.toml` samples per organ.
 
 Verify:
 ```bash
