@@ -172,7 +172,7 @@ autonomic status
 
 ## Integration Architecture
 
-For the complete 11-organ architecture specification, data flows, and MCP tool contracts, see the centralized [Autonomic AI Architecture Hub](https://autonomic-ai.dev/docs/architecture).
+For the complete 11-organ architecture specification, data flows, and MCP tool contracts, see the centralized [Autonomic AI Architecture Hub](https://autonomic-ai.dev/docs/architecture) and the [Supervision & Control Plane Guide](https://autonomic-ai.dev/docs/supervision).
 
 The integration surface between organs is defined by three layers:
 
