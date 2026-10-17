@@ -146,7 +146,8 @@ pub fn load_or_create_credentials(
     if path.exists() {
         let raw = fs::read_to_string(&path)?;
         if let Ok(bundle) = serde_json::from_str::<NatsCredentialBundle>(&raw)
-            && bundle.port == port && bundle.tls_enabled == tls_enabled
+            && bundle.port == port
+            && bundle.tls_enabled == tls_enabled
         {
             return Ok(bundle);
         }

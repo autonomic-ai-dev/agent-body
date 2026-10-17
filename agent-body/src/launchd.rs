@@ -9,7 +9,9 @@ pub const PLIST_LABEL: &str = "com.autonomic.daemons";
 
 pub fn plist_path() -> Result<PathBuf> {
     let home = dirs::home_dir().context("could not determine user home directory")?;
-    Ok(home.join("Library/LaunchAgents").join(format!("{PLIST_LABEL}.plist")))
+    Ok(home
+        .join("Library/LaunchAgents")
+        .join(format!("{PLIST_LABEL}.plist")))
 }
 
 pub fn resolve_binary_path() -> PathBuf {
@@ -100,10 +102,7 @@ pub fn install() -> Result<()> {
         .with_context(|| format!("failed to write plist to {}", plist.display()))?;
 
     // Unload existing service if already loaded, then load -w
-    let _ = Command::new("launchctl")
-        .arg("unload")
-        .arg(&plist)
-        .output();
+    let _ = Command::new("launchctl").arg("unload").arg(&plist).output();
 
     let status = Command::new("launchctl")
         .arg("load")
@@ -126,12 +125,8 @@ pub fn install() -> Result<()> {
 pub fn uninstall() -> Result<()> {
     let plist = plist_path()?;
     if plist.exists() {
-        let _ = Command::new("launchctl")
-            .arg("unload")
-            .arg(&plist)
-            .output();
-        fs::remove_file(&plist)
-            .with_context(|| format!("failed to remove {}", plist.display()))?;
+        let _ = Command::new("launchctl").arg("unload").arg(&plist).output();
+        fs::remove_file(&plist).with_context(|| format!("failed to remove {}", plist.display()))?;
         println!("✓ LaunchAgent uninstalled: {}", plist.display());
     } else {
         println!("LaunchAgent plist does not exist: {}", plist.display());

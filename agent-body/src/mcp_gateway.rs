@@ -67,13 +67,38 @@ fn organ_routes() -> HashMap<&'static str, OrganRoute> {
     m
 }
 
+fn resolve_binary_path(binary: &str) -> std::path::PathBuf {
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let candidate = parent.join(binary);
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+    let homebrew_candidate = std::path::Path::new("/opt/homebrew/bin").join(binary);
+    if homebrew_candidate.exists() {
+        return homebrew_candidate;
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let cargo_candidate = std::path::PathBuf::from(home)
+            .join(".cargo/bin")
+            .join(binary);
+        if cargo_candidate.exists() {
+            return cargo_candidate;
+        }
+    }
+    std::path::PathBuf::from(binary)
+}
+
 async fn connect_organ(route: &OrganRoute) -> Result<RunningService<RoleClient, ()>, McpError> {
     let _ = tokio::task::spawn_blocking(|| {
         crate::supervisor::ensure_running_quiet().ok();
     })
     .await;
 
-    let mut command = Command::new(route.binary);
+    let bin = resolve_binary_path(route.binary);
+    let mut command = Command::new(bin);
     command.arg(route.subcommand);
 
     if route.binary == "agent-spine" {
@@ -672,6 +697,36 @@ impl ServerHandler for McpGateway {
     }
 }
 
+pub fn evaluate_auto_downgrade(model: &str, headroom_pct: f64) -> String {
+    if headroom_pct >= 5.0 {
+        return model.to_string();
+    }
+    match model {
+        "claude-3-7-sonnet" | "claude-3-5-sonnet" => "claude-3-5-haiku".to_string(),
+        "gpt-4o" => "gpt-4o-mini".to_string(),
+        "gemini-1.5-pro" | "gemini-2.0-pro" => "gemini-2.0-flash".to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub fn should_escalate_to_mouth(
+    current_spend: f64,
+    ceiling: f64,
+) -> Option<MouthRequestApprovalParams> {
+    if current_spend >= ceiling {
+        Some(MouthRequestApprovalParams {
+            message: format!(
+                "Hard budget ceiling of ${:.2} exceeded (current spend: ${:.2}). Human approval required.",
+                ceiling, current_spend
+            ),
+            action: "budget_ceiling_breach".into(),
+            webhook_url: None,
+        })
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -728,17 +783,26 @@ mod tests {
         // 1. heart_usage_summary
         let summary_schema = schemars::schema_for!(HeartUsageSummaryParams);
         let summary_json = serde_json::to_value(&summary_schema).expect("schema");
-        assert!(summary_json.get("properties").and_then(|p| p.get("lookback_days")).is_some());
+        assert!(summary_json
+            .get("properties")
+            .and_then(|p| p.get("lookback_days"))
+            .is_some());
 
         // 2. heart_quota_status
         let quota_schema = schemars::schema_for!(EmptyParams);
         let quota_json = serde_json::to_value(&quota_schema).expect("schema");
-        assert_eq!(quota_json.get("type").and_then(|v| v.as_str()), Some("object"));
+        assert_eq!(
+            quota_json.get("type").and_then(|v| v.as_str()),
+            Some("object")
+        );
 
         // 3. heart_record_usage
         let record_schema = schemars::schema_for!(HeartRecordUsageParams);
         let record_json = serde_json::to_value(&record_schema).expect("schema");
-        let req = record_json.get("required").and_then(|v| v.as_array()).unwrap();
+        let req = record_json
+            .get("required")
+            .and_then(|v| v.as_array())
+            .unwrap();
         assert!(req.iter().any(|v| v == "organ"));
         assert!(req.iter().any(|v| v == "provider"));
         assert!(req.iter().any(|v| v == "model"));
@@ -747,13 +811,22 @@ mod tests {
     #[test]
     fn test_auto_downgrade_logic_below_five_percent() {
         // >= 5% headroom maintains full model
-        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 5.0), "claude-3-7-sonnet");
+        assert_eq!(
+            evaluate_auto_downgrade("claude-3-7-sonnet", 5.0),
+            "claude-3-7-sonnet"
+        );
         assert_eq!(evaluate_auto_downgrade("gpt-4o", 10.0), "gpt-4o");
 
         // < 5% headroom triggers auto-downgrade policy
-        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 4.9), "claude-3-5-haiku");
+        assert_eq!(
+            evaluate_auto_downgrade("claude-3-7-sonnet", 4.9),
+            "claude-3-5-haiku"
+        );
         assert_eq!(evaluate_auto_downgrade("gpt-4o", 2.0), "gpt-4o-mini");
-        assert_eq!(evaluate_auto_downgrade("gemini-1.5-pro", 0.5), "gemini-2.0-flash");
+        assert_eq!(
+            evaluate_auto_downgrade("gemini-1.5-pro", 0.5),
+            "gemini-2.0-flash"
+        );
     }
 
     #[test]
@@ -766,32 +839,5 @@ mod tests {
         assert_eq!(escalation.action, "budget_ceiling_breach");
         assert!(escalation.message.contains("105.00"));
         assert!(escalation.message.contains("100.00"));
-    }
-}
-
-pub fn evaluate_auto_downgrade(model: &str, headroom_pct: f64) -> String {
-    if headroom_pct >= 5.0 {
-        return model.to_string();
-    }
-    match model {
-        "claude-3-7-sonnet" | "claude-3-5-sonnet" => "claude-3-5-haiku".to_string(),
-        "gpt-4o" => "gpt-4o-mini".to_string(),
-        "gemini-1.5-pro" | "gemini-2.0-pro" => "gemini-2.0-flash".to_string(),
-        other => other.to_string(),
-    }
-}
-
-pub fn should_escalate_to_mouth(current_spend: f64, ceiling: f64) -> Option<MouthRequestApprovalParams> {
-    if current_spend >= ceiling {
-        Some(MouthRequestApprovalParams {
-            message: format!(
-                "Hard budget ceiling of ${:.2} exceeded (current spend: ${:.2}). Human approval required.",
-                ceiling, current_spend
-            ),
-            action: "budget_ceiling_breach".into(),
-            webhook_url: None,
-        })
-    } else {
-        None
     }
 }
