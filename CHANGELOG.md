@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.0-beta.3] - 2026-10-17
+
+### Added
+- **Organ Catalog Onboarding** — `agent-brain` discovery and onboarding command integration.
+- **Lazy Daemon Auto-Spawn** — Gateway auto-spawns missing background daemons (`nats`, `spine`, `nerves`, `heart`, `brain`) on-demand when tools are invoked.
+- **Launchd Management** — Persistent macOS LaunchAgent management via `autonomic launchd install|uninstall|status`.
+
+### Changed
+- Relocated comprehensive `CONTEXT.md` to repository root and migrated architectural guides to central documentation hub.
+- Consolidated `MIN_COMPATIBLE_VERSION` enforcement in `autonomic doctor`.
+
+## [1.0.0-beta.2] - 2026-10-16
+
+### Added
+- Multi-host agent installation for agent-body MCP gateway (`agent-body install --all` and individual editor flags).
+- Intercepted `server/discover` probe for Antigravity and Go MCP SDK compatibility.
+- Official Homebrew tap formula support (`brew install autonomic` / `brew install autonomic-stack`).
+
+### Changed
+- Made installation scripts standalone for curl pipe execution.
+
 ## [1.0.0-beta.1] - 2026-10-16
 
 ### Added
