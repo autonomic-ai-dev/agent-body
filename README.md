@@ -115,9 +115,14 @@ agent-body solves all three with a single meta-CLI:
 | `autonomic doctor` | Verify organ binaries and workspace health |
 | `autonomic update` | List installed organ versions on PATH |
 | `autonomic status` | Workspace paths + supervisor PID/health table |
+| `autonomic launchd install` | Register and load persistent LaunchAgent on macOS (`~/Library/LaunchAgents/com.autonomic.daemons.plist`) |
+| `autonomic launchd uninstall` | Unload and remove LaunchAgent |
+| `autonomic launchd status` | Check LaunchAgent registration and daemon status |
 | `autonomic tui` | Live CPU/RAM dashboard for autonomic processes |
-| `autonomic serve-mcp` | Start MCP API Gateway (aggregates all organ tools over stdio) |
+| `autonomic serve-mcp` | Start MCP API Gateway (auto-spawns stopped daemons quietly on-demand) |
 | `autonomic <organ> …` | Proxy any command to `agent-{organ}` |
+
+> **Lazy Auto-Spawn**: When your AI agent or IDE accesses `autonomic serve-mcp` or triggers an organ tool via the gateway, `agent-body` checks process health and automatically boots missing background daemons (`nats`, `spine`, `nerves`, `heart`, `brain`) in topological order with zero manual intervention.
 
 ---
 
