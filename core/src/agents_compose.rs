@@ -93,10 +93,10 @@ pub fn scaffold_agents_dir() -> Result<()> {
     }
     for organ in FRAGMENT_ORDER {
         let path = dir.join(format!("{organ}.md"));
-        if !path.is_file() {
-            if let Some(content) = default_fragment(organ) {
-                fs::write(&path, content.trim()).context("write organ fragment")?;
-            }
+        if !path.is_file()
+            && let Some(content) = default_fragment(organ)
+        {
+            fs::write(&path, content.trim()).context("write organ fragment")?;
         }
     }
     let readme = dir.join("README");

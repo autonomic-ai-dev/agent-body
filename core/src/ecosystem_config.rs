@@ -73,13 +73,12 @@ pub fn agents_config() -> Result<AgentsConfig> {
 pub fn effective_sync(organ: Option<&str>) -> Result<SyncConfig> {
     let root = load_config_table()?;
     let mut base: SyncConfig = table_to_value(root.get("sync"));
-    if let Some(organ) = organ {
-        if let Some(sync_table) = root.get("sync").and_then(|v| v.as_table()) {
-            if let Some(override_val) = sync_table.get(organ) {
-                let organ_cfg: SyncConfig = table_to_value(Some(override_val));
-                merge_sync(&mut base, &organ_cfg);
-            }
-        }
+    if let Some(organ) = organ
+        && let Some(sync_table) = root.get("sync").and_then(|v| v.as_table())
+        && let Some(override_val) = sync_table.get(organ)
+    {
+        let organ_cfg: SyncConfig = table_to_value(Some(override_val));
+        merge_sync(&mut base, &organ_cfg);
     }
     Ok(base)
 }
@@ -87,11 +86,11 @@ pub fn effective_sync(organ: Option<&str>) -> Result<SyncConfig> {
 pub fn effective_update(organ: &str) -> Result<UpdateConfig> {
     let root = load_config_table()?;
     let mut base: UpdateConfig = table_to_value(root.get("update"));
-    if let Some(update_table) = root.get("update").and_then(|v| v.as_table()) {
-        if let Some(override_val) = update_table.get(organ) {
-            let organ_cfg: UpdateConfig = table_to_value(Some(override_val));
-            merge_update(&mut base, &organ_cfg);
-        }
+    if let Some(update_table) = root.get("update").and_then(|v| v.as_table())
+        && let Some(override_val) = update_table.get(organ)
+    {
+        let organ_cfg: UpdateConfig = table_to_value(Some(override_val));
+        merge_update(&mut base, &organ_cfg);
     }
     Ok(base)
 }

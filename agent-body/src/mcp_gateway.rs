@@ -136,7 +136,15 @@ impl McpGateway {
             sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+}
 
+impl Default for McpGateway {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl McpGateway {
     pub async fn run() -> anyhow::Result<()> {
         tokio::task::spawn_blocking(|| {
             let _ = crate::supervisor::ensure_running_quiet();
@@ -311,6 +319,39 @@ fn default_threshold() -> f64 {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct HeartUsageSummaryParams {
+    #[serde(default = "default_lookback")]
+    lookback_days: u32,
+}
+
+fn default_lookback() -> u32 {
+    30
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct HeartRecordUsageParams {
+    organ: String,
+    provider: String,
+    model: String,
+    #[serde(default = "default_billing")]
+    billing_type: String,
+    prompt_tokens: u64,
+    completion_tokens: u64,
+    #[serde(default)]
+    cache_read_tokens: u64,
+    #[serde(default)]
+    cache_write_tokens: u64,
+    #[serde(default)]
+    latency_ms: u64,
+    #[serde(default)]
+    session_id: Option<String>,
+}
+
+fn default_billing() -> String {
+    "metered_api".into()
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 struct MuscleExecuteParams {
     command: String,
     #[serde(default)]
@@ -446,6 +487,39 @@ impl McpGateway {
         _params: Parameters<EmptyParams>,
     ) -> Result<CallToolResult, McpError> {
         self.forward("heart", "heart_status", serde_json::json!({}))
+            .await
+    }
+
+    #[tool(
+        description = "Return multi-day token usage, cost burn rate, and month-end spend projections"
+    )]
+    async fn heart_usage_summary(
+        &self,
+        params: Parameters<HeartUsageSummaryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        self.forward_params("heart", "heart_usage_summary", params.0)
+            .await
+    }
+
+    #[tool(
+        description = "Return active subscription quota utilization percentages and reset timestamps"
+    )]
+    async fn heart_quota_status(
+        &self,
+        _params: Parameters<EmptyParams>,
+    ) -> Result<CallToolResult, McpError> {
+        self.forward("heart", "heart_quota_status", serde_json::json!({}))
+            .await
+    }
+
+    #[tool(
+        description = "Record a model turn usage event and automatically calculate cost and rollups"
+    )]
+    async fn heart_record_usage(
+        &self,
+        params: Parameters<HeartRecordUsageParams>,
+    ) -> Result<CallToolResult, McpError> {
+        self.forward_params("heart", "heart_record_usage", params.0)
             .await
     }
 
@@ -629,5 +703,23 @@ mod tests {
             .and_then(|v| v.as_array())
             .expect("required array");
         assert!(required.iter().any(|v| v == "command"));
+    }
+
+    #[test]
+    fn usage_summary_params_defaults_lookback_to_30() {
+        assert_eq!(default_lookback(), 30);
+    }
+
+    #[test]
+    fn record_usage_params_require_model_and_provider() {
+        assert_eq!(default_billing(), "metered_api");
+        let schema = schemars::schema_for!(HeartRecordUsageParams);
+        let json = serde_json::to_value(&schema).expect("schema");
+        let required = json
+            .get("required")
+            .and_then(|v| v.as_array())
+            .expect("required array");
+        assert!(required.iter().any(|v| v == "model"));
+        assert!(required.iter().any(|v| v == "provider"));
     }
 }

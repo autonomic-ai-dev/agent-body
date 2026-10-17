@@ -48,9 +48,7 @@ pub fn update(force: bool) -> Result<bool> {
 /// Ensure `agent-tui` is installed, optionally refresh, then run it.
 pub fn run(force: bool) -> Result<()> {
     let dest = canonical_binary()?;
-    if !dest.is_file() {
-        update(true)?;
-    } else if force {
+    if !dest.is_file() || force {
         update(true)?;
     } else {
         let _ = update(false)?;

@@ -125,7 +125,7 @@ pub async fn run(quick: bool) -> Result<()> {
 
     let mut all_healthy = true;
     for (alias, binary) in crate::router::ORGANS {
-        let step = progress.step(format!("{alias}"));
+        let step = progress.step(alias.to_string());
         match check_binary(binary).await {
             Ok(version) => {
                 if is_version_compatible(&version) {

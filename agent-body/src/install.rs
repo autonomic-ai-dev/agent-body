@@ -18,6 +18,7 @@ pub enum HostTarget {
 }
 
 impl HostTarget {
+    #[allow(clippy::too_many_arguments)]
     pub fn parse(
         host: Option<&str>,
         all: bool,
@@ -31,34 +32,34 @@ impl HostTarget {
         gemini: bool,
         antigravity: bool,
     ) -> Self {
-        if all || host.as_deref() == Some("all") {
+        if all || host == Some("all") {
             return Self::All;
         }
-        if cursor || host.as_deref() == Some("cursor") {
+        if cursor || host == Some("cursor") {
             return Self::Cursor { global };
         }
         if claude_desktop
-            || host.as_deref() == Some("claude-desktop")
-            || host.as_deref() == Some("claude")
+            || host == Some("claude-desktop")
+            || host == Some("claude")
         {
             return Self::ClaudeDesktop;
         }
-        if vscode || host.as_deref() == Some("vscode") {
+        if vscode || host == Some("vscode") {
             return Self::VsCode { user: global };
         }
-        if claude_code || host.as_deref() == Some("claude-code") {
+        if claude_code || host == Some("claude-code") {
             return Self::ClaudeCode { user: global };
         }
-        if opencode || host.as_deref() == Some("opencode") {
+        if opencode || host == Some("opencode") {
             return Self::OpenCode { user: global };
         }
-        if codex || host.as_deref() == Some("codex") {
+        if codex || host == Some("codex") {
             return Self::Codex { user: global };
         }
-        if gemini || host.as_deref() == Some("gemini") {
+        if gemini || host == Some("gemini") {
             return Self::Gemini { user: global };
         }
-        if antigravity || host.as_deref() == Some("antigravity") {
+        if antigravity || host == Some("antigravity") {
             return Self::Antigravity { user: global };
         }
         // Default to Cursor with global flag

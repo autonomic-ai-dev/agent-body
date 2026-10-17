@@ -32,18 +32,18 @@ pub fn strip_progress_argv(args: Vec<String>) -> Vec<String> {
     out.push(args[0].clone());
     let mut i = 1;
     while i < args.len() {
-        if args[i] == "--progress" {
-            if let Some(v) = args.get(i + 1).and_then(|s| parse_progress_mode_str(s)) {
-                mode = Some(v);
-                i += 2;
-                continue;
-            }
-        } else if let Some(rest) = args[i].strip_prefix("--progress=") {
-            if let Some(m) = parse_progress_mode_str(rest) {
-                mode = Some(m);
-                i += 1;
-                continue;
-            }
+        if args[i] == "--progress"
+            && let Some(v) = args.get(i + 1).and_then(|s| parse_progress_mode_str(s))
+        {
+            mode = Some(v);
+            i += 2;
+            continue;
+        } else if let Some(rest) = args[i].strip_prefix("--progress=")
+            && let Some(m) = parse_progress_mode_str(rest)
+        {
+            mode = Some(m);
+            i += 1;
+            continue;
         }
         out.push(args[i].clone());
         i += 1;
