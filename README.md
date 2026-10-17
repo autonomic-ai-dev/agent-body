@@ -6,7 +6,7 @@
 
 Without `agent-body`, you would have to manually configure, boot, and monitor 8 different binaries. With it, you run a single command (`autonomic start`) to boot the entire cluster in the correct topological order.
 
-Full context: [docs/CONTEXT.md](docs/CONTEXT.md) · Architecture: [https://autonomic-ai.dev/docs/architecture](https://autonomic-ai.dev/docs/architecture)
+Full context: [CONTEXT.md](CONTEXT.md) · Architecture: [https://autonomic-ai.dev/docs/architecture](https://autonomic-ai.dev/docs/architecture)
 
 ---
 
