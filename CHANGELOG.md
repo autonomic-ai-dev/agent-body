@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0-beta.3.1] - 2026-10-17
+
+### Added
+- **MCP Usage & Budget Governance Forwarding (ABH-9)**: Transparent telemetry forwarding across standard MCP protocol tools, recording token usage, latency, and cost metadata for downstream analytics.
+- Verification test suite in `.verify/run.sh` ensuring zero compilation warnings and rigorous MCP gateway pass criteria.
+
+### Changed
+- Bumped version to `v1.0.0-beta.3.1`.
+
 ## [1.0.0-beta.3] - 2026-10-17
 
 ### Added
