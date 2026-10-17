@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-beta.3.2] - 2026-10-18
+
+### Added
+- **Governance Auto-Downgrade & Mouth Escalation (ABH-9)**: Implemented automatic model downgrade evaluation for budgets below 5% headroom and human approval escalation via `agent-mouth` on ceiling breaches.
+- **Resilient Organ Binary Resolution**: Enhanced `connect_organ` with `resolve_binary_path` across sibling directories, Homebrew, Cargo, and system PATH.
+- **CI Skip Path Optimizations**: Added changelog, context, and documentation skips to `.github/workflows/ci.yml`.
+
+### Fixed
+- Resolved `clippy::items-after-test-module` in `mcp_gateway.rs`.
+
+### Changed
+- Bumped version to `v1.0.0-beta.3.2`.
+
 ## [1.0.0-beta.3.1] - 2026-10-17
 
 ### Added
