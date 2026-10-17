@@ -6,7 +6,7 @@
 
 Without `agent-body`, you would have to manually configure, boot, and monitor 8 different binaries. With it, you run a single command (`autonomic start`) to boot the entire cluster in the correct topological order.
 
-Full context & operational architecture: [docs/CONTEXT.md](docs/CONTEXT.md)
+Full context: [docs/CONTEXT.md](docs/CONTEXT.md) · Architecture: [https://autonomic-ai.dev/docs/architecture](https://autonomic-ai.dev/docs/architecture)
 
 ---
 
@@ -171,6 +171,8 @@ autonomic status
 ---
 
 ## Integration Architecture
+
+For the complete 11-organ architecture specification, data flows, and MCP tool contracts, see the centralized [Autonomic AI Architecture Hub](https://autonomic-ai.dev/docs/architecture).
 
 The integration surface between organs is defined by three layers:
 
