@@ -1,0 +1,9 @@
+[verify]
+commands = [
+  "cargo test --workspace",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo check --workspace",
+  ".verify/playbooks/verify_full_suite.sh",
+  ".verify/playbooks/verify_mcp_gateway.sh",
+  ".verify/playbooks/verify_degradation.sh",
+]

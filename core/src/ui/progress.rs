@@ -213,13 +213,13 @@ impl<'a> ProgressStep<'a> {
             record.detail
         );
         emit_step_line(self.run.mode, self.run.total_hint, &record);
-        if let Some(detail) = detail {
-            if matches!(status, ProgressStatus::Failed | ProgressStatus::Warn) {
-                let _ = writeln!(self.run.log_buf, "        {detail}");
-                if self.run.mode != ProgressMode::Quiet {
-                    for line in detail.lines() {
-                        println!("        {line}");
-                    }
+        if let Some(detail) = detail
+            && matches!(status, ProgressStatus::Failed | ProgressStatus::Warn)
+        {
+            let _ = writeln!(self.run.log_buf, "        {detail}");
+            if self.run.mode != ProgressMode::Quiet {
+                for line in detail.lines() {
+                    println!("        {line}");
                 }
             }
         }

@@ -121,19 +121,19 @@ fn curl_first_redirect_location(url: &str) -> Result<String> {
 }
 
 fn parse_tag_name_from_json(body: &str) -> Result<String> {
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
-        if let Some(tag) = value.get("tag_name").and_then(|v| v.as_str()) {
-            return Ok(tag.to_string());
-        }
+    if let Some(tag) = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("tag_name")?.as_str().map(String::from))
+    {
+        return Ok(tag);
     }
     for line in body.lines() {
         if let Some(start) = line.find("\"tag_name\":") {
             let rest = line[start + 11..].trim_start();
-            if rest.starts_with('"') {
-                let rest = &rest[1..];
-                if let Some(end) = rest.find('"') {
-                    return Ok(rest[..end].to_string());
-                }
+            if let Some(rest) = rest.strip_prefix('"')
+                && let Some(end) = rest.find('"')
+            {
+                return Ok(rest[..end].to_string());
             }
         }
     }
