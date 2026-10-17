@@ -422,11 +422,11 @@ struct MouthValidateAstParams {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
-struct MouthRequestApprovalParams {
-    message: String,
-    action: String,
+pub struct MouthRequestApprovalParams {
+    pub message: String,
+    pub action: String,
     #[serde(default)]
-    webhook_url: Option<String>,
+    pub webhook_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -721,5 +721,77 @@ mod tests {
             .expect("required array");
         assert!(required.iter().any(|v| v == "model"));
         assert!(required.iter().any(|v| v == "provider"));
+    }
+
+    #[test]
+    fn json_schema_validation_for_all_three_governance_tools() {
+        // 1. heart_usage_summary
+        let summary_schema = schemars::schema_for!(HeartUsageSummaryParams);
+        let summary_json = serde_json::to_value(&summary_schema).expect("schema");
+        assert!(summary_json.get("properties").and_then(|p| p.get("lookback_days")).is_some());
+
+        // 2. heart_quota_status
+        let quota_schema = schemars::schema_for!(EmptyParams);
+        let quota_json = serde_json::to_value(&quota_schema).expect("schema");
+        assert_eq!(quota_json.get("type").and_then(|v| v.as_str()), Some("object"));
+
+        // 3. heart_record_usage
+        let record_schema = schemars::schema_for!(HeartRecordUsageParams);
+        let record_json = serde_json::to_value(&record_schema).expect("schema");
+        let req = record_json.get("required").and_then(|v| v.as_array()).unwrap();
+        assert!(req.iter().any(|v| v == "organ"));
+        assert!(req.iter().any(|v| v == "provider"));
+        assert!(req.iter().any(|v| v == "model"));
+    }
+
+    #[test]
+    fn test_auto_downgrade_logic_below_five_percent() {
+        // >= 5% headroom maintains full model
+        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 5.0), "claude-3-7-sonnet");
+        assert_eq!(evaluate_auto_downgrade("gpt-4o", 10.0), "gpt-4o");
+
+        // < 5% headroom triggers auto-downgrade policy
+        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 4.9), "claude-3-5-haiku");
+        assert_eq!(evaluate_auto_downgrade("gpt-4o", 2.0), "gpt-4o-mini");
+        assert_eq!(evaluate_auto_downgrade("gemini-1.5-pro", 0.5), "gemini-2.0-flash");
+    }
+
+    #[test]
+    fn test_mouth_escalation_on_budget_ceiling_breach() {
+        // Within budget: no escalation
+        assert!(should_escalate_to_mouth(95.0, 100.0).is_none());
+
+        // Exceeded budget: triggers agent-mouth approval request
+        let escalation = should_escalate_to_mouth(105.0, 100.0).expect("should escalate");
+        assert_eq!(escalation.action, "budget_ceiling_breach");
+        assert!(escalation.message.contains("105.00"));
+        assert!(escalation.message.contains("100.00"));
+    }
+}
+
+pub fn evaluate_auto_downgrade(model: &str, headroom_pct: f64) -> String {
+    if headroom_pct >= 5.0 {
+        return model.to_string();
+    }
+    match model {
+        "claude-3-7-sonnet" | "claude-3-5-sonnet" => "claude-3-5-haiku".to_string(),
+        "gpt-4o" => "gpt-4o-mini".to_string(),
+        "gemini-1.5-pro" | "gemini-2.0-pro" => "gemini-2.0-flash".to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub fn should_escalate_to_mouth(current_spend: f64, ceiling: f64) -> Option<MouthRequestApprovalParams> {
+    if current_spend >= ceiling {
+        Some(MouthRequestApprovalParams {
+            message: format!(
+                "Hard budget ceiling of ${:.2} exceeded (current spend: ${:.2}). Human approval required.",
+                ceiling, current_spend
+            ),
+            action: "budget_ceiling_breach".into(),
+            webhook_url: None,
+        })
+    } else {
+        None
     }
 }
