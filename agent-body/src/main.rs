@@ -50,11 +50,26 @@ enum AgentsCommands {
 }
 
 #[derive(Subcommand)]
+enum LaunchdCommands {
+    /// Install and load the com.autonomic.daemons LaunchAgent
+    Install,
+    /// Unload and remove the com.autonomic.daemons LaunchAgent
+    Uninstall,
+    /// Check the LaunchAgent installation and status
+    Status,
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// Scaffold workspace and optional project directory
     Init {
         #[arg(short, long)]
         name: Option<String>,
+    },
+    /// Manage background daemons LaunchAgent on macOS
+    Launchd {
+        #[command(subcommand)]
+        command: LaunchdCommands,
     },
     /// Start background daemons (nerves, heart)
     Start,
@@ -208,6 +223,11 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Some(Commands::Init { name }) => agent_body::init::init_project(name.as_deref())?,
+        Some(Commands::Launchd { command }) => match command {
+            LaunchdCommands::Install => agent_body::launchd::install()?,
+            LaunchdCommands::Uninstall => agent_body::launchd::uninstall()?,
+            LaunchdCommands::Status => agent_body::launchd::status()?,
+        },
         Some(Commands::Start) => agent_body::supervisor::start_all()?,
         Some(Commands::Stop) => agent_body::supervisor::stop_all()?,
         Some(Commands::Restart) => agent_body::supervisor::restart_all()?,

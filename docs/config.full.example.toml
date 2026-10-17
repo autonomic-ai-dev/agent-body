@@ -54,7 +54,29 @@ cron = "0 3 * * *"
 
 [heart.token_budget]
 enabled = true
-ceiling = 8000
+max_tokens_per_route = 8000
+max_wasm_fuel_per_route = 10000000
+wasm_anomaly_multiplier = 4.0
+
+[heart.distillation]
+enabled = true
+cron = "0 0 2 * * 0"
+threshold = 0.75
+
+# Background self-learning critic (inspects verify_outcomes, records anti-patterns/reinforcements)
+[heart.self_learning]
+enabled = true
+cron = "0 */15 * * * *"
+min_outcomes = 1
+lookback_days = 7
+
+# Nightly MLX dataset pipeline & model finetuning
+[heart.finetune]
+enabled = true
+cron = "0 0 4 * * *"
+min_merged_entries = 1
+ui_threshold = 1.0
+memory_threshold_kb = 524288
 
 # --- agent-nerves (NATS bridge, default :3102) ---
 [nerves]

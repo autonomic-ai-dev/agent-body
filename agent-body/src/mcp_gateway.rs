@@ -68,6 +68,11 @@ fn organ_routes() -> HashMap<&'static str, OrganRoute> {
 }
 
 async fn connect_organ(route: &OrganRoute) -> Result<RunningService<RoleClient, ()>, McpError> {
+    let _ = tokio::task::spawn_blocking(|| {
+        crate::supervisor::ensure_running_quiet().ok();
+    })
+    .await;
+
     let mut command = Command::new(route.binary);
     command.arg(route.subcommand);
 
@@ -133,6 +138,12 @@ impl McpGateway {
     }
 
     pub async fn run() -> anyhow::Result<()> {
+        tokio::task::spawn_blocking(|| {
+            let _ = crate::supervisor::ensure_running_quiet();
+        })
+        .await
+        .ok();
+
         let server = McpGateway::new();
         let mut stdin = BufReader::new(tokio::io::stdin());
         let mut stdout = tokio::io::stdout();
