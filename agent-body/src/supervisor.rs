@@ -264,6 +264,52 @@ pub fn collect_status() -> Result<Vec<DaemonStatus>> {
     Ok(out)
 }
 
+pub fn ensure_running_quiet() -> Result<()> {
+    let statuses = collect_status()?;
+    let all_healthy = statuses.iter().all(|s| s.running && s.healthy);
+    if all_healthy {
+        return Ok(());
+    }
+
+    let mut specs: Vec<_> = DAEMONS.iter().collect();
+    specs.sort_by_key(|s| s.start_order);
+
+    agent_body_core::ensure_dirs()?;
+    let supervisor_dir = supervisor_dir();
+    fs::create_dir_all(&supervisor_dir)?;
+
+    let nats_bootstrap = nats_config::ensure_nats_security().ok();
+
+    for spec in specs.iter().filter(|s| s.start_order == 0) {
+        let is_healthy = statuses
+            .iter()
+            .find(|s| s.name == spec.name)
+            .map(|s| s.running && s.healthy)
+            .unwrap_or(false);
+        if !is_healthy {
+            if let Ok(_pid) = start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
+                let _ = wait_for_health(spec, 5);
+            }
+        }
+    }
+
+    for spec in specs.iter().filter(|s| s.start_order > 0) {
+        let is_healthy = statuses
+            .iter()
+            .find(|s| s.name == spec.name)
+            .map(|s| s.running && s.healthy)
+            .unwrap_or(false);
+        if !is_healthy {
+            if let Ok(_pid) = start_daemon(spec, &supervisor_dir, nats_bootstrap.as_ref()) {
+                let _ = wait_for_health(spec, 5);
+            }
+        }
+    }
+
+    let _ = write_status_snapshot();
+    Ok(())
+}
+
 fn write_status_snapshot() -> Result<()> {
     let statuses = collect_status()?;
     let path = supervisor_dir().join("status.json");
@@ -285,7 +331,7 @@ fn start_daemon(
         if check_health(spec.health_url) {
             anyhow::bail!("already running and healthy (pid {existing})");
         }
-        stop_daemon(spec, false).ok();
+        stop_daemon(spec, true).ok();
     }
 
     if !binary_on_path(spec.binary) {
