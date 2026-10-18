@@ -84,7 +84,11 @@ async fn connect_organ(route: &OrganRoute) -> Result<RunningService<RoleClient, 
         }
     }
 
-    let transport = TokioChildProcess::new(command.configure(|_| {})).map_err(|e| {
+    let transport = TokioChildProcess::new(command.configure(|cmd| {
+        cmd.env("RUST_LOG", "error");
+        cmd.stderr(std::process::Stdio::inherit());
+    }))
+    .map_err(|e| {
         McpError::internal_error(format!("failed to spawn {}: {e}", route.binary), None)
     })?;
 
@@ -210,24 +214,40 @@ impl McpGateway {
         match first {
             Ok(result) => Ok(result),
             Err(first_err) => {
+                {
+                    let mut sessions = self.sessions.lock().await;
+                    sessions.remove(organ_key);
+                }
+
+                let service = match connect_organ(route).await {
+                    Ok(s) => s,
+                    Err(connect_err) => {
+                        let mut sessions = self.sessions.lock().await;
+                        sessions.remove(organ_key);
+                        return Err(McpError::internal_error(
+                            format!(
+                                "tool call failed ({first_err}); reconnect failed: {connect_err}"
+                            ),
+                            None,
+                        ));
+                    }
+                };
+
+                let res = service.call_tool(req).await;
                 let mut sessions = self.sessions.lock().await;
-                sessions.remove(organ_key);
-                drop(sessions);
-                let mut sessions = self.sessions.lock().await;
-                let service = connect_organ(route).await?;
-                sessions.insert(organ_key, service);
-                let service = sessions.get(organ_key).ok_or_else(|| {
-                    McpError::internal_error(
-                        format!("session vanished for organ '{organ_key}'"),
-                        None,
-                    )
-                })?;
-                service.call_tool(req).await.map_err(|e| {
-                    McpError::internal_error(
-                        format!("tool call failed after reconnect: {first_err}; {e}"),
-                        None,
-                    )
-                })
+                match res {
+                    Ok(result) => {
+                        sessions.insert(organ_key, service);
+                        Ok(result)
+                    }
+                    Err(call_err) => {
+                        sessions.remove(organ_key);
+                        Err(McpError::internal_error(
+                            format!("tool call failed after reconnect: {first_err}; {call_err}"),
+                            None,
+                        ))
+                    }
+                }
             }
         }
     }
@@ -672,6 +692,36 @@ impl ServerHandler for McpGateway {
     }
 }
 
+pub fn evaluate_auto_downgrade(model: &str, headroom_pct: f64) -> String {
+    if headroom_pct >= 5.0 {
+        return model.to_string();
+    }
+    match model {
+        "claude-3-7-sonnet" | "claude-3-5-sonnet" => "claude-3-5-haiku".to_string(),
+        "gpt-4o" => "gpt-4o-mini".to_string(),
+        "gemini-1.5-pro" | "gemini-2.0-pro" => "gemini-2.0-flash".to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub fn should_escalate_to_mouth(
+    current_spend: f64,
+    ceiling: f64,
+) -> Option<MouthRequestApprovalParams> {
+    if current_spend >= ceiling {
+        Some(MouthRequestApprovalParams {
+            message: format!(
+                "Hard budget ceiling of ${:.2} exceeded (current spend: ${:.2}). Human approval required.",
+                ceiling, current_spend
+            ),
+            action: "budget_ceiling_breach".into(),
+            webhook_url: None,
+        })
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -728,17 +778,26 @@ mod tests {
         // 1. heart_usage_summary
         let summary_schema = schemars::schema_for!(HeartUsageSummaryParams);
         let summary_json = serde_json::to_value(&summary_schema).expect("schema");
-        assert!(summary_json.get("properties").and_then(|p| p.get("lookback_days")).is_some());
+        assert!(summary_json
+            .get("properties")
+            .and_then(|p| p.get("lookback_days"))
+            .is_some());
 
         // 2. heart_quota_status
         let quota_schema = schemars::schema_for!(EmptyParams);
         let quota_json = serde_json::to_value(&quota_schema).expect("schema");
-        assert_eq!(quota_json.get("type").and_then(|v| v.as_str()), Some("object"));
+        assert_eq!(
+            quota_json.get("type").and_then(|v| v.as_str()),
+            Some("object")
+        );
 
         // 3. heart_record_usage
         let record_schema = schemars::schema_for!(HeartRecordUsageParams);
         let record_json = serde_json::to_value(&record_schema).expect("schema");
-        let req = record_json.get("required").and_then(|v| v.as_array()).unwrap();
+        let req = record_json
+            .get("required")
+            .and_then(|v| v.as_array())
+            .unwrap();
         assert!(req.iter().any(|v| v == "organ"));
         assert!(req.iter().any(|v| v == "provider"));
         assert!(req.iter().any(|v| v == "model"));
@@ -747,13 +806,22 @@ mod tests {
     #[test]
     fn test_auto_downgrade_logic_below_five_percent() {
         // >= 5% headroom maintains full model
-        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 5.0), "claude-3-7-sonnet");
+        assert_eq!(
+            evaluate_auto_downgrade("claude-3-7-sonnet", 5.0),
+            "claude-3-7-sonnet"
+        );
         assert_eq!(evaluate_auto_downgrade("gpt-4o", 10.0), "gpt-4o");
 
         // < 5% headroom triggers auto-downgrade policy
-        assert_eq!(evaluate_auto_downgrade("claude-3-7-sonnet", 4.9), "claude-3-5-haiku");
+        assert_eq!(
+            evaluate_auto_downgrade("claude-3-7-sonnet", 4.9),
+            "claude-3-5-haiku"
+        );
         assert_eq!(evaluate_auto_downgrade("gpt-4o", 2.0), "gpt-4o-mini");
-        assert_eq!(evaluate_auto_downgrade("gemini-1.5-pro", 0.5), "gemini-2.0-flash");
+        assert_eq!(
+            evaluate_auto_downgrade("gemini-1.5-pro", 0.5),
+            "gemini-2.0-flash"
+        );
     }
 
     #[test]
@@ -766,32 +834,5 @@ mod tests {
         assert_eq!(escalation.action, "budget_ceiling_breach");
         assert!(escalation.message.contains("105.00"));
         assert!(escalation.message.contains("100.00"));
-    }
-}
-
-pub fn evaluate_auto_downgrade(model: &str, headroom_pct: f64) -> String {
-    if headroom_pct >= 5.0 {
-        return model.to_string();
-    }
-    match model {
-        "claude-3-7-sonnet" | "claude-3-5-sonnet" => "claude-3-5-haiku".to_string(),
-        "gpt-4o" => "gpt-4o-mini".to_string(),
-        "gemini-1.5-pro" | "gemini-2.0-pro" => "gemini-2.0-flash".to_string(),
-        other => other.to_string(),
-    }
-}
-
-pub fn should_escalate_to_mouth(current_spend: f64, ceiling: f64) -> Option<MouthRequestApprovalParams> {
-    if current_spend >= ceiling {
-        Some(MouthRequestApprovalParams {
-            message: format!(
-                "Hard budget ceiling of ${:.2} exceeded (current spend: ${:.2}). Human approval required.",
-                ceiling, current_spend
-            ),
-            action: "budget_ceiling_breach".into(),
-            webhook_url: None,
-        })
-    } else {
-        None
     }
 }

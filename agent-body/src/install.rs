@@ -38,10 +38,7 @@ impl HostTarget {
         if cursor || host == Some("cursor") {
             return Self::Cursor { global };
         }
-        if claude_desktop
-            || host == Some("claude-desktop")
-            || host == Some("claude")
-        {
+        if claude_desktop || host == Some("claude-desktop") || host == Some("claude") {
             return Self::ClaudeDesktop;
         }
         if vscode || host == Some("vscode") {
