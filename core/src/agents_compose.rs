@@ -5,22 +5,37 @@ use std::path::{Path, PathBuf};
 use crate::ecosystem_config;
 use crate::global_workspace;
 
-pub const BASE_AGENT_MODE: &str = r#"# Autonomic agent mode
+pub const BASE_AGENT_MODE: &str = r#"# Autonomic Agent Mode & Orchestration Policy
 
-Enforces route_task before every turn — memory, skills, and cross-session context are injected automatically.
+This environment is governed by the Autonomic 11-Organ Ecosystem. All AI agents (Claude Code, Cursor, Codex, OpenCode, Gemini, Antigravity) must route through agent-brain and adhere to these operational protocols.
 
-## Rules
-- Call `agent-brain_route_task` with `user_message`, `current_working_directory`, `open_files` at the start of every turn
-- Call `get_autonomic_catalog` on session start to discover organ capabilities and tools
-- Delegate terminal execution to `muscle_execute_bash` / `muscle_execute_python` instead of raw host terminal tools
-- Orchestrate multi-step pipelines via `spine_submit_workflow` with automatic rollback gates
-- Use agent-brain `grep_search`, `file_summary`, `read_file_head`, `read_file_tail` instead of native Read/Grep
-- Call `agent-brain verify -- <cmd>` for allowlisted test runs to record trusted cryptographic outcomes
-- Call `store_memory` at task end for durable outcomes
+## 1. Mandatory Pre-Flight Turn Routine
+- Route Before Action: Always call `agent-brain_route_task` (or `route_task` MCP tool) with `user_message`, `current_working_directory`, and `open_files` at the start of every turn before running commands, file reads, or edits.
+- Discover Capabilities: When starting complex tasks or unknown workflows, call `get_autonomic_catalog` to discover available organ tools and delegation rules.
+- Durable Memory: Always call `store_memory` at task end to persist key learnings, bug fixes, decisions, and system patterns into vector memory (`brain.db`).
+
+## 2. Tool Delegation & Bounded Exploration (Never Raw Grep/Cat/Ls/Find)
+- Bounded Exploration & Traversal: Use `agent-brain`'s organ tools (`list_directory` for `ls`, `find_files` for `find`/`glob`, `read_file` for `cat`/`view_file`, `read_file_head`, `read_file_tail`, `file_summary`, `grep_search`) instead of host commands.
+- Sandboxed Execution & In-Gateway AST Validation: Delegate all command execution to `agent-muscle` (`muscle_execute_bash`). `agent-body` automatically passes every command through `agent-mouth` AST safety validation in-gateway before execution, eliminating manual 2-step roundtrips.
+- Self-Correction (No Bypass): If a command is rejected by AST validation or fails execution, the agent must diagnose and correct the command; NEVER attempt to bypass the gate or fall back to native host improvisation.
+- Workflows & DAGs: Orchestrate multi-step pipelines via `agent-spine` (`spine_submit_workflow`, `agent-spine run --workflow engineering-safety`, or `agent-spine run --meta "..."`).
+
+## 3. Resilient Tool Calls, 3-Retry Policy & Auto-Recovery (No Fallback Stickiness)
+- Automatic 3-Retry & Timeout Protection: `agent-body` enforces per-call deadlines and automatically retries failed or timed-out tool invocations up to 3 times with session auto-recovery before engaging fallback.
+- Auto-Recovery in Same Session: Failed or crashed organ sessions are automatically evicted and re-established cleanly. Even if a tool call encounters a degraded fallback response, the organ is immediately eligible for primary execution on the next invocation.
+- NO Fallback Stickiness: Never latch onto raw host commands after a fallback. Always re-attempt the designated organ MCP tools (`muscle_execute_bash`, `mouth_validate_ast`, `heart_budget_status`, etc.) on subsequent actions in the same session.
+
+## 4. Engineering Safety & Mandatory 5-Gate Verification Workflow
+Never equate confidence, plausible reasoning, successful compilation, or passing a single test with correctness. Changes must be proven safe through machine-verifiable evidence, not narrative persuasion.
+- Gate 1 — Understand: Inspect code, callers, interfaces, contracts, dependencies, and baseline behavior before touching files.
+- Gate 2 — Predict Failure: Enumerate invariants, boundary conditions (null/empty/overflow), failure paths (timeouts/restarts), API/data compatibility, concurrency/races, and rollback requirements.
+- Gate 3 — Implement: Implement the smallest change satisfying requirements while preserving existing contracts.
+- Gate 4 — Attempt to Break It: Run regression tests, edge-case tests, static analysis (`clippy`), and fault-injection where relevant. Never modify tests merely to obtain a green result.
+- Gate 5 — Verify and Report: Execute independent verification with observable outputs. Explicitly state tested failure modes, observed results, and any unresolved risks.
 
 ## Autonomic utilities (delegate, don't improvise)
 - Execution: `muscle_execute_bash` for sandboxed builds, tests, git operations, and commands
-- Workflows: `agent-spine run --meta "..."`, `spine_submit_workflow`, or `agent-spine init --with @workflow`
+- Workflows: `agent-spine run --workflow engineering-safety`, `spine_submit_workflow`, or `agent-spine init --with @workflow`
 - Ecosystem catalog: `get_autonomic_catalog` (comprehensive organ capabilities)
 - Discovery: `agent-brain registry list` (skills + utilities)
 - Upstream MCP: `route_to_mcp` when `suggested_tools` appears in route_task
@@ -85,15 +100,19 @@ pub fn default_fragment(organ: &str) -> Option<&'static str> {
 }
 
 pub fn scaffold_agents_dir() -> Result<()> {
+    scaffold_agents_dir_force(false)
+}
+
+pub fn scaffold_agents_dir_force(force: bool) -> Result<()> {
     let dir = global_workspace::agents_dir();
     fs::create_dir_all(&dir).context("create agents dir")?;
     let base = dir.join("base.md");
-    if !base.is_file() {
+    if force || !base.is_file() {
         fs::write(&base, BASE_AGENT_MODE).context("write agents/base.md")?;
     }
     for organ in FRAGMENT_ORDER {
         let path = dir.join(format!("{organ}.md"));
-        if !path.is_file()
+        if (force || !path.is_file())
             && let Some(content) = default_fragment(organ)
         {
             fs::write(&path, content.trim()).context("write organ fragment")?;
@@ -130,7 +149,7 @@ fn compose_agents_md_inner(force: bool) -> Result<PathBuf> {
         anyhow::bail!("agents.compose_agents_md is false in config");
     }
 
-    scaffold_agents_dir()?;
+    scaffold_agents_dir_force(force)?;
 
     let mut parts = Vec::new();
     let base_path = global_workspace::agents_dir().join("base.md");
