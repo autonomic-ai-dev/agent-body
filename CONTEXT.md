@@ -1,7 +1,7 @@
 # Autonomic AI Ecosystem: Comprehensive Architectural & Operational Context
 
 > **The Kubernetes for AI Agents** — Complete architectural deep dive, component taxonomy, cross-daemon protocols, and operational reference for `agent-body` and the entire Autonomic AI cluster.  
-> **Target Version:** v1.0.0-beta.3.2 ecosystem baseline  
+> **Target Version:** v1.0.0-beta.3.3 ecosystem baseline  
 > **Documentation Hub:** [https://autonomic-ai.dev/docs/supervision](https://autonomic-ai.dev/docs/supervision) · Architecture: [https://autonomic-ai.dev/docs/architecture](https://autonomic-ai.dev/docs/architecture)  
 > **Workspace Root:** `~/.autonomic/` (`config.toml`, `memory/`, `broker/`, `state/`, `logs/`, `agents/`)
 
