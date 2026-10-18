@@ -6,6 +6,7 @@
 - **Automatic In-Gateway AST Validation (`muscle_execute_bash`)**: Integrated automatic pre-execution security validation through `agent-mouth`. Eliminates manual two-step roundtrips while ensuring commands violating security policies (fork bombs, destructive deletions, dynamic code execution) are rejected with exit code 126 and structured remediation advice.
 - **Hardened Heuristic Safety for Fallbacks**: Implemented fallback AST inspection in `execute_fallback` rejecting unsafe patterns during degraded mode.
 - **Session Auto-Recovery Without Stickiness**: Evicts stale or failed child sessions immediately to guarantee primary organ tools are re-attempted cleanly on subsequent turns.
+- **5-Gate Engineering Safety Policy in `BASE_AGENT_MODE`**: Embedded mandatory 5-gate safety workflow (Understand, Predict Failure, Implement, Attempt to Break, Verify) into `BASE_AGENT_MODE` and added `scaffold_agents_dir_force(force)` to refresh existing installations.
 
 ### Changed
 - Bumped version to `v1.0.0-beta.3.3`.
