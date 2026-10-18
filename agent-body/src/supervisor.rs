@@ -11,7 +11,7 @@ use agent_body_core::memory_dir;
 use agent_body_core::organ_state_dir;
 use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
 
-use crate::degradation::DegradationState;
+use crate::degradation::{DegradationLevel, DegradationState};
 use agent_body_core::ui::ProgressRun;
 
 use crate::nats_config;
@@ -641,6 +641,19 @@ pub fn build_organs_health_report() -> Result<OrgansHealthReport> {
         degradation: DegradationState::from_mesh_score(mesh_score),
         organs,
     })
+}
+
+pub fn cached_status_report() -> Option<DegradationLevel> {
+    let path = supervisor_dir().join("status.json");
+    let content = fs::read_to_string(path).ok()?;
+    let statuses: Vec<DaemonStatus> = serde_json::from_str(&content).ok()?;
+    let total = statuses.len();
+    if total == 0 {
+        return Some(DegradationLevel::Full);
+    }
+    let healthy_count = statuses.iter().filter(|s| s.running && s.healthy).count();
+    let score = ((healthy_count as f64 / total as f64) * 100.0) as u8;
+    Some(DegradationLevel::from_mesh_score(score))
 }
 
 pub fn wait_for_brain_index(timeout_secs: u64) -> Result<()> {
