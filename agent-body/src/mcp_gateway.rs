@@ -321,6 +321,29 @@ impl McpGateway {
                     .get("command")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
+                let lower = cmd_str.to_lowercase();
+                if lower.contains("rm -rf /")
+                    || lower.contains("rm -rf /*")
+                    || lower.contains(":(){ :|:& };:")
+                    || (lower.contains("curl") && (lower.contains("| sh") || lower.contains("| bash")))
+                    || lower.contains("eval $")
+                    || lower.contains("eval `")
+                {
+                    return Ok(CallToolResult::success(vec![Content::text(serde_json::json!({
+                        "job_id": format!("fallback-ast-blocked-{now_ms}"),
+                        "command": cmd_str,
+                        "exit_code": 126,
+                        "stdout": "",
+                        "stderr": "Command rejected by in-gateway AST safety heuristic validation",
+                        "duration_ms": 0,
+                        "success": false,
+                        "fallback_executed": true,
+                        "ast_validation": {
+                            "approved": false,
+                            "remedy": "Correct the command to conform with AST safety policies. Destructive or pipe-to-shell patterns are blocked."
+                        }
+                    }).to_string())]));
+                }
                 let cwd = arguments.get("cwd").and_then(|v| v.as_str());
                 let mut cmd = tokio::process::Command::new("bash");
                 cmd.arg("-c").arg(cmd_str);
@@ -801,11 +824,63 @@ impl McpGateway {
             .await
     }
 
-    #[tool(description = "Execute a shell script/command via tokio::process::Command")]
+    #[tool(
+        description = "Execute a shell script/command via tokio::process::Command with automatic in-gateway AST safety validation"
+    )]
     async fn muscle_execute_bash(
         &self,
         params: Parameters<MuscleExecuteParams>,
     ) -> Result<CallToolResult, McpError> {
+        let cmd = &params.0.command;
+        // In-gateway AST validation via agent-mouth
+        let val_args = serde_json::json!({ "command": cmd });
+        let val_res = self
+            .forward("mouth", "mouth_validate_ast", val_args)
+            .await?;
+        let mut approved = true;
+        let mut issues = Vec::new();
+        for item in &val_res.content {
+            let text = if let Some(t) = item.as_text() {
+                t.text.clone()
+            } else if let Ok(v) = serde_json::to_value(item) {
+                v.get("text")
+                    .or_else(|| v.pointer("/raw/text"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            } else {
+                String::new()
+            };
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                if parsed.get("approved").and_then(|a| a.as_bool()) == Some(false) {
+                    approved = false;
+                }
+                if let Some(iss) = parsed.get("issues").and_then(|i| i.as_array()) {
+                    issues.extend(iss.clone());
+                }
+            }
+        }
+
+        if !approved {
+            let rejection = serde_json::json!({
+                "job_id": "ast_validation_rejected",
+                "command": cmd,
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": format!("Command rejected by in-gateway AST safety validation: {:?}", issues),
+                "duration_ms": 0,
+                "success": false,
+                "ast_validation": {
+                    "approved": false,
+                    "issues": issues,
+                    "remedy": "Correct the command to conform with AST safety policies. Do not attempt dangerous patterns (fork bombs, destructive rm -rf, unvalidated dynamic evaluation)."
+                }
+            });
+            return Ok(CallToolResult::success(vec![Content::text(
+                rejection.to_string(),
+            )]));
+        }
+
         self.forward_params("muscle", "muscle_execute_bash", params.0)
             .await
     }
@@ -1230,5 +1305,39 @@ mod tests {
                 "Session must not be poisoned with dead connection"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_fallback_muscle_execute_bash_blocks_destructive_commands() {
+        let gateway = McpGateway::new();
+        let destructive_args = serde_json::json!({"command": "rm -rf / --no-preserve-root"});
+        let res = gateway
+            .execute_fallback(
+                "muscle",
+                "muscle_execute_bash",
+                &destructive_args,
+                "offline",
+            )
+            .await
+            .unwrap();
+        let text = res.content[0].as_text().unwrap().text.clone();
+        let val: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(val["exit_code"], 126);
+        assert_eq!(val["success"], false);
+        assert!(val["stderr"].as_str().unwrap().contains("AST safety"));
+    }
+
+    #[tokio::test]
+    async fn test_fallback_muscle_execute_bash_executes_safe_commands() {
+        let gateway = McpGateway::new();
+        let safe_args = serde_json::json!({"command": "echo safe_bash_test"});
+        let res = gateway
+            .execute_fallback("muscle", "muscle_execute_bash", &safe_args, "offline")
+            .await
+            .unwrap();
+        let text = res.content[0].as_text().unwrap().text.clone();
+        let val: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(val["exit_code"], 0);
+        assert!(val["stdout"].as_str().unwrap().contains("safe_bash_test"));
     }
 }

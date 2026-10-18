@@ -3,6 +3,9 @@
 ## [1.0.0-beta.3.2] - 2026-10-18
 
 ### Added
+- **Automatic In-Gateway AST Validation (`muscle_execute_bash`)**: Integrated automatic pre-execution security validation through `agent-mouth`. Eliminates manual two-step roundtrips while ensuring commands violating security policies (fork bombs, destructive deletions, dynamic code execution) are rejected with exit code 126 and structured remediation advice.
+- **Hardened Heuristic Safety for Fallbacks**: Implemented fallback AST inspection in `execute_fallback` rejecting unsafe patterns during degraded mode.
+- **Session Auto-Recovery Without Stickiness**: Evicts stale or failed child sessions immediately to guarantee primary organ tools are re-attempted cleanly on subsequent turns.
 - **Governance Auto-Downgrade & Mouth Escalation (ABH-9)**: Implemented automatic model downgrade evaluation for budgets below 5% headroom and human approval escalation via `agent-mouth` on ceiling breaches.
 - **Resilient Organ Binary Resolution**: Enhanced `connect_organ` with `resolve_binary_path` across sibling directories, Homebrew, Cargo, and system PATH.
 - **CI Skip Path Optimizations**: Added changelog, context, and documentation skips to `.github/workflows/ci.yml`.
