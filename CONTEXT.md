@@ -1,7 +1,7 @@
 # Autonomic AI Ecosystem: Comprehensive Architectural & Operational Context
 
 > **The Kubernetes for AI Agents** — Complete architectural deep dive, component taxonomy, cross-daemon protocols, and operational reference for `agent-body` and the entire Autonomic AI cluster.  
-> **Target Version:** v1.0.0-beta.3.2 ecosystem baseline  
+> **Target Version:** v1.0.0-beta.3.3 ecosystem baseline  
 > **Documentation Hub:** [https://autonomic-ai.dev/docs/supervision](https://autonomic-ai.dev/docs/supervision) · Architecture: [https://autonomic-ai.dev/docs/architecture](https://autonomic-ai.dev/docs/architecture)  
 > **Workspace Root:** `~/.autonomic/` (`config.toml`, `memory/`, `broker/`, `state/`, `logs/`, `agents/`)
 
@@ -212,7 +212,7 @@ Every repository in `autonomic-ai-dev` implements a discrete cloud-native role:
   - `lora_hot_swap.rs`: Hot-swaps LoRA adapter weights in active local inference servers (e.g. vLLM, Ollama).
   - `jetstream_consumer.rs`: Consumes async execution requests from NATS topics (`MUSCLE.exec.>`).
 - **Key MCP Tools:**
-  - `muscle_execute_bash`: Run a bash command in a sandboxed, monitored environment.
+  - `muscle_execute_bash`: Run a bash command in a sandboxed, monitored environment with automatic in-gateway AST safety validation via `agent-mouth`.
   - `muscle_train_lora`: Trigger a background LoRA training run.
   - `muscle_hot_swap_adapter`: Activate a fine-tuned LoRA adapter.
 - **Key CLI Verbs:**

@@ -21,7 +21,7 @@ pub mod workspace_update;
 
 pub use agents_compose::{
     BASE_AGENT_MODE, FRAGMENT_ORDER, compose_agents_md, default_fragment,
-    install_host_agents_md_links, scaffold_agents_dir, write_fragment,
+    install_host_agents_md_links, scaffold_agents_dir, scaffold_agents_dir_force, write_fragment,
 };
 pub use config_migrate::{
     migrate_brain_yaml_if_needed, migrate_spine_legacy_if_needed, run_legacy_migrations,
