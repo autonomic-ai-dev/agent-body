@@ -21,4 +21,6 @@ serde_yaml = "0.9"
 toml = "0.8"
 uuid = { version = "1", features = ["v7", "serde"] }
 thiserror = "2"
+tree-sitter = "0.26"
+tree-sitter-bash = "0.25"
 
