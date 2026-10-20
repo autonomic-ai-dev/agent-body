@@ -20,6 +20,15 @@ pub fn is_version_compatible(version_str: &str) -> bool {
     }
 }
 
+async fn event_bus_connected() -> Result<bool> {
+    let output = tokio::process::Command::new("agent-nerves")
+        .arg("ping")
+        .output()
+        .await?;
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    Ok(parsed.get("connected").and_then(serde_json::Value::as_bool) == Some(true))
+}
+
 async fn latest_release(binary: &str) -> Option<String> {
     let binary = binary.to_string();
     tokio::task::spawn_blocking(move || {
@@ -116,9 +125,9 @@ fn log_dir() -> PathBuf {
 pub async fn run(quick: bool) -> Result<()> {
     let organ_count = crate::router::ORGANS.len();
     let total = if quick {
-        organ_count + 2
-    } else {
         organ_count + 3
+    } else {
+        organ_count + 4
     };
     let mut progress = ProgressRun::new("Autonomic health check").with_total_hint(total);
 
@@ -140,6 +149,13 @@ pub async fn run(quick: bool) -> Result<()> {
         agents_md.done();
     } else {
         agents_md.warn("missing AGENTS.md — run `autonomic agents compose`");
+    }
+
+    let bus = progress.step("event bus (nerves)");
+    match event_bus_connected().await {
+        Ok(true) => bus.done(),
+        Ok(false) => bus.warn("NATS broker not reachable; start it with `agent-body start`"),
+        Err(e) => bus.warn(format!("agent-nerves unavailable: {e}")),
     }
 
     let mut all_healthy = true;
