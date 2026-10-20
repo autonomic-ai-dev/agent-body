@@ -20,6 +20,34 @@ pub fn is_version_compatible(version_str: &str) -> bool {
     }
 }
 
+async fn event_bus_connected() -> Result<bool> {
+    let output = tokio::process::Command::new("agent-nerves")
+        .arg("ping")
+        .output()
+        .await?;
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    Ok(parsed.get("connected").and_then(serde_json::Value::as_bool) == Some(true))
+}
+
+async fn latest_release(binary: &str) -> Option<String> {
+    let binary = binary.to_string();
+    tokio::task::spawn_blocking(move || {
+        let repo = format!("autonomic-ai-dev/{binary}");
+        agent_body_core::github_release::fetch_latest_tag(&repo, &binary).ok()
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+pub fn is_outdated(installed_output: &str, latest_tag: &str) -> bool {
+    let installed = installed_output
+        .split_whitespace()
+        .last()
+        .unwrap_or(installed_output);
+    agent_body_core::github_release::version_is_newer(latest_tag, installed)
+}
+
 #[derive(Debug, Serialize)]
 pub struct DoctorStats {
     pub workspace: String,
@@ -97,9 +125,9 @@ fn log_dir() -> PathBuf {
 pub async fn run(quick: bool) -> Result<()> {
     let organ_count = crate::router::ORGANS.len();
     let total = if quick {
-        organ_count + 2
-    } else {
         organ_count + 3
+    } else {
+        organ_count + 4
     };
     let mut progress = ProgressRun::new("Autonomic health check").with_total_hint(total);
 
@@ -123,15 +151,29 @@ pub async fn run(quick: bool) -> Result<()> {
         agents_md.warn("missing AGENTS.md — run `autonomic agents compose`");
     }
 
+    let bus = progress.step("event bus (nerves)");
+    match event_bus_connected().await {
+        Ok(true) => bus.done(),
+        Ok(false) => bus.warn("NATS broker not reachable; start it with `agent-body start`"),
+        Err(e) => bus.warn(format!("agent-nerves unavailable: {e}")),
+    }
+
     let mut all_healthy = true;
     for (alias, binary) in crate::router::ORGANS {
         let step = progress.step(alias.to_string());
         match check_binary(binary).await {
             Ok(version) => {
-                if is_version_compatible(&version) {
-                    step.done();
-                } else {
+                if !is_version_compatible(&version) {
                     step.warn(format!("{version} (< {MIN_COMPATIBLE_VERSION})"));
+                } else if let Some(latest) = latest_release(binary)
+                    .await
+                    .filter(|latest| is_outdated(&version, latest))
+                {
+                    step.warn(format!(
+                        "{version} (latest release {latest}; reinstall to update)"
+                    ));
+                } else {
+                    step.done();
                 }
             }
             Err(e) => {
@@ -298,6 +340,19 @@ fn scan_log_for_errors(path: &PathBuf, max_lines: usize) -> Result<Vec<String>> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_outdated_when_latest_release_is_newer() {
+        assert!(is_outdated("agent-brain 1.0.0-beta.3.7", "v1.0.0-beta.3.8"));
+        assert!(!is_outdated(
+            "agent-brain 1.0.0-beta.3.8",
+            "v1.0.0-beta.3.8"
+        ));
+        assert!(!is_outdated(
+            "agent-brain 1.0.0-beta.3.9",
+            "v1.0.0-beta.3.8"
+        ));
+    }
 
     #[test]
     fn format_stats_line_counts_healthy_organs() {
