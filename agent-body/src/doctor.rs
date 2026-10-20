@@ -20,6 +20,25 @@ pub fn is_version_compatible(version_str: &str) -> bool {
     }
 }
 
+async fn latest_release(binary: &str) -> Option<String> {
+    let binary = binary.to_string();
+    tokio::task::spawn_blocking(move || {
+        let repo = format!("autonomic-ai-dev/{binary}");
+        agent_body_core::github_release::fetch_latest_tag(&repo, &binary).ok()
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+pub fn is_outdated(installed_output: &str, latest_tag: &str) -> bool {
+    let installed = installed_output
+        .split_whitespace()
+        .last()
+        .unwrap_or(installed_output);
+    agent_body_core::github_release::version_is_newer(latest_tag, installed)
+}
+
 #[derive(Debug, Serialize)]
 pub struct DoctorStats {
     pub workspace: String,
@@ -128,10 +147,17 @@ pub async fn run(quick: bool) -> Result<()> {
         let step = progress.step(alias.to_string());
         match check_binary(binary).await {
             Ok(version) => {
-                if is_version_compatible(&version) {
-                    step.done();
-                } else {
+                if !is_version_compatible(&version) {
                     step.warn(format!("{version} (< {MIN_COMPATIBLE_VERSION})"));
+                } else if let Some(latest) = latest_release(binary)
+                    .await
+                    .filter(|latest| is_outdated(&version, latest))
+                {
+                    step.warn(format!(
+                        "{version} (latest release {latest}; reinstall to update)"
+                    ));
+                } else {
+                    step.done();
                 }
             }
             Err(e) => {
@@ -298,6 +324,19 @@ fn scan_log_for_errors(path: &PathBuf, max_lines: usize) -> Result<Vec<String>> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_outdated_when_latest_release_is_newer() {
+        assert!(is_outdated("agent-brain 1.0.0-beta.3.7", "v1.0.0-beta.3.8"));
+        assert!(!is_outdated(
+            "agent-brain 1.0.0-beta.3.8",
+            "v1.0.0-beta.3.8"
+        ));
+        assert!(!is_outdated(
+            "agent-brain 1.0.0-beta.3.9",
+            "v1.0.0-beta.3.8"
+        ));
+    }
 
     #[test]
     fn format_stats_line_counts_healthy_organs() {
