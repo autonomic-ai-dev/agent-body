@@ -6,14 +6,15 @@ use rmcp::model::{
     CallToolRequestParams, CallToolResult, Content, ErrorData as McpError, Implementation,
     ServerCapabilities, ServerInfo,
 };
-use rmcp::service::{RoleClient, RunningService};
+use rmcp::service::{RoleClient, RunningService, ServiceError};
 use rmcp::transport::ConfigureCommandExt;
 use rmcp::transport::TokioChildProcess;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler, ServiceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tokio::sync::Mutex;
+
+use crate::session_cache::{retry_delay, SessionCache};
 
 struct OrganRoute {
     binary: &'static str,
@@ -67,6 +68,13 @@ fn organ_routes() -> HashMap<&'static str, OrganRoute> {
     m
 }
 
+fn evicts_session(err: &ServiceError) -> bool {
+    matches!(
+        err,
+        ServiceError::TransportSend(_) | ServiceError::TransportClosed
+    )
+}
+
 async fn connect_organ(route: &OrganRoute) -> Result<RunningService<RoleClient, ()>, McpError> {
     let mut command = Command::new(route.binary);
     command.arg(route.subcommand);
@@ -101,12 +109,11 @@ async fn connect_organ(route: &OrganRoute) -> Result<RunningService<RoleClient, 
         })
 }
 
-type OrganSession = Arc<RunningService<RoleClient, ()>>;
-type SessionMap = Arc<Mutex<HashMap<&'static str, OrganSession>>>;
+type OrganSession = RunningService<RoleClient, ()>;
 
 #[derive(Clone)]
 pub struct McpGateway {
-    sessions: SessionMap,
+    sessions: Arc<SessionCache<OrganSession>>,
 }
 
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -144,7 +151,7 @@ async fn first_stdin_line(
 impl McpGateway {
     pub fn new() -> Self {
         McpGateway {
-            sessions: Arc::new(Mutex::new(HashMap::new())),
+            sessions: Arc::new(SessionCache::default()),
         }
     }
 }
@@ -215,36 +222,25 @@ impl McpGateway {
         let mut last_error_msg = String::new();
 
         for attempt in 1..=MAX_ATTEMPTS {
-            let service = {
-                let mut sessions = self.sessions.lock().await;
-                if let Some(s) = sessions.get(organ_key) {
-                    Arc::clone(s)
-                } else {
-                    match connect_organ(route).await {
-                        Ok(s) => {
-                            let arc = Arc::new(s);
-                            sessions.insert(organ_key, Arc::clone(&arc));
-                            arc
-                        }
-                        Err(e) => {
-                            last_error_msg = format!("connect failed on attempt {attempt}: {e}");
-                            tracing::warn!(
-                                target: "mcp_gateway",
-                                organ = organ_key,
-                                attempt,
-                                error = %e,
-                                "connect attempt failed"
-                            );
-                            sessions.remove(organ_key);
-                            if attempt < MAX_ATTEMPTS {
-                                tokio::time::sleep(std::time::Duration::from_millis(
-                                    150 * attempt as u64,
-                                ))
-                                .await;
-                            }
-                            continue;
-                        }
+            let service = match self
+                .sessions
+                .get_or_connect(organ_key, connect_organ(route))
+                .await
+            {
+                Ok(service) => service,
+                Err(e) => {
+                    last_error_msg = format!("connect failed on attempt {attempt}: {e}");
+                    tracing::warn!(
+                        target: "mcp_gateway",
+                        organ = organ_key,
+                        attempt,
+                        error = %e,
+                        "connect attempt failed"
+                    );
+                    if attempt < MAX_ATTEMPTS {
+                        tokio::time::sleep(retry_delay(attempt as u32)).await;
                     }
+                    continue;
                 }
             };
 
@@ -262,11 +258,8 @@ impl McpGateway {
                         error = %err,
                         "tool call attempt failed"
                     );
-                    let mut sessions = self.sessions.lock().await;
-                    if let Some(current) = sessions.get(organ_key) {
-                        if Arc::ptr_eq(current, &service) {
-                            sessions.remove(organ_key);
-                        }
+                    if evicts_session(&err) {
+                        self.sessions.evict(organ_key, &service).await;
                     }
                 }
                 Err(_elapsed) => {
@@ -281,21 +274,16 @@ impl McpGateway {
                         attempt,
                         "tool call timed out"
                     );
-                    let mut sessions = self.sessions.lock().await;
-                    if let Some(current) = sessions.get(organ_key) {
-                        if Arc::ptr_eq(current, &service) {
-                            sessions.remove(organ_key);
-                        }
-                    }
+                    self.sessions.evict(organ_key, &service).await;
                 }
             }
 
             if attempt < MAX_ATTEMPTS {
-                tokio::time::sleep(std::time::Duration::from_millis(150 * attempt as u64)).await;
+                tokio::time::sleep(retry_delay(attempt as u32)).await;
             }
         }
 
-        // All 3 attempts failed — execute resilient, autorecoverable fallback
+        // All 3 attempts failed — degrade through the fallback
         self.execute_fallback(organ_key, tool_name, &arguments, &last_error_msg)
             .await
     }
@@ -1095,15 +1083,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_non_sticky_session_autorecovery() {
+    async fn muscle_outage_reports_a_structured_error() {
         let gateway = McpGateway::new();
-        // Initially no active sessions
-        {
-            let sessions = gateway.sessions.lock().await;
-            assert!(sessions.get("muscle").is_none());
-        }
-
-        // When a call fails 3 times, session is evicted so next call has a clean slate
         let args = serde_json::json!({"command": "echo 123"});
         let res = gateway
             .execute_fallback(
@@ -1114,16 +1095,18 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(res.content[0].as_text().is_some());
+        let text = res.content[0].as_text().unwrap().text.clone();
+        let val: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(val["executed"], false);
+        assert_eq!(val["tool"], "muscle_execute_bash");
+    }
 
-        // Session map remains clean for next invocation to re-attempt real organ
-        {
-            let sessions = gateway.sessions.lock().await;
-            assert!(
-                sessions.get("muscle").is_none(),
-                "Session must not be poisoned with dead connection"
-            );
-        }
+    #[test]
+    fn transport_failures_evict_but_tool_errors_keep_the_session() {
+        assert!(evicts_session(&ServiceError::TransportClosed));
+        assert!(!evicts_session(&ServiceError::McpError(
+            McpError::internal_error("tool failed", None)
+        )));
     }
 
     #[tokio::test]

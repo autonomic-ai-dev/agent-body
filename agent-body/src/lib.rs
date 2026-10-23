@@ -11,6 +11,7 @@ pub mod log;
 pub mod mcp_gateway;
 pub mod nats_config;
 pub mod router;
+pub mod session_cache;
 pub mod supervisor;
 pub mod sync_cmd;
 pub mod tui;
