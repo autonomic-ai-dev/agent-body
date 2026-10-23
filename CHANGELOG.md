@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-beta.3.9] - 2026-10-21
+
+### Added
+- `doctor` warns when an organ binary is behind the latest release.
+- Shared bash AST guard in `agent-body-core`.
+- macOS CLI notarization step when `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER_ID` secrets are set.
+
+
 ## [1.0.0-beta.3.3] - 2026-10-18
 
 ### Added
