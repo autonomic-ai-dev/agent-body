@@ -29,4 +29,4 @@ Summary: One bash AST guard decides which shell commands are rejected before any
 ## Gotchas
 
 - The policy is stricter than before for agent-muscle. `rm -rf target/` and `find ... -delete` are now rejected everywhere, not only under protected roots. Clean build directories with a non-recursive command or a tool-specific clean.
-- Mouth, muscle, and immune call this guard at v1.0.0-beta.3.11. Each organ's wrapper runs `COMMAND_POLICY_CORPUS` in its own tests.
+- Mouth, muscle, and immune call this guard at v1.0.0-beta.3.11. Mouth and muscle run `COMMAND_POLICY_CORPUS` through their wrappers in their own tests.
