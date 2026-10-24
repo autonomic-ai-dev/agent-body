@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.0-beta.3.10] - 2026-10-24
+
+### Added
+- `ExecuteResult.degraded` marks a sandbox run that lacked its isolation backend. Older payloads deserialize with `degraded: false`.
+
 ## [1.0.0-beta.3.9] - 2026-10-21
 
 ### Added
