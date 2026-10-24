@@ -8,6 +8,7 @@ pub mod execution;
 pub mod github_release;
 pub mod global_workspace;
 pub mod guard;
+pub mod guard_corpus;
 pub mod nats;
 pub mod nats_auth;
 #[cfg(feature = "nats")]
