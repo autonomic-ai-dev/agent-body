@@ -37,6 +37,11 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
   - Behaviour: As stated in `AGENTS.md` section 5 for the gateway.
   - Outcome: Retries and the final error are returned to the caller. Not yet verified by a test in this pass.
 
+- `shared-execute-result`: The sandbox result payload that agent-spine consumes.
+  - Intent: Let orchestration see when a run lacked its isolation backend.
+  - Behaviour: `ExecuteResult` (`core/src/nats.rs`) has `degraded: bool`, which defaults to `false` when absent from older payloads. Immune's Firecracker subprocess fallback (AUTONOMIC_IMMUNE_ALLOW_SUBPROCESS_FALLBACK=1) will set it after immune re-pins to a tag that contains this field. Until then immune's pinned `v1.0.0-beta.3` leaves it unset. Body itself does not construct the type.
+  - Outcome: Tests `payload_without_degraded_defaults_to_false` and `degraded_flag_round_trips` in `core/src/nats.rs` pass under `cargo test --workspace`.
+
 ## Code
 
 - `agent-body`

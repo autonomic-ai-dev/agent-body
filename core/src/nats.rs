@@ -108,4 +108,37 @@ pub struct ExecuteResult {
     /// Peak WASM linear memory bytes (WASM backend only).
     #[serde(default)]
     pub memory_peak_bytes: Option<usize>,
+    #[serde(default)]
+    pub degraded: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ExecuteResult;
+
+    #[test]
+    fn payload_without_degraded_defaults_to_false() {
+        let raw =
+            r#"{"msg_id":"m","job_id":"j","exit_code":0,"stdout":"","stderr":"","success":true}"#;
+        let result: ExecuteResult = serde_json::from_str(raw).unwrap();
+        assert!(!result.degraded);
+    }
+
+    #[test]
+    fn degraded_flag_round_trips() {
+        let result = ExecuteResult {
+            msg_id: "m".into(),
+            job_id: "j".into(),
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: "degraded: subprocess fallback".into(),
+            success: true,
+            fuel_consumed: None,
+            memory_peak_bytes: None,
+            degraded: true,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: ExecuteResult = serde_json::from_str(&json).unwrap();
+        assert!(back.degraded);
+    }
 }
