@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## [1.0.0-rc1] - 2026-10-24
 
 ### Security
@@ -8,6 +7,7 @@
 
 ### Changed
 - Release candidate. The shared command policy, the inline-interpreter rule, and the Python tool removal are included.
+
 ## [1.0.0-beta.3.11] - 2026-10-24
 
 ### Changed
