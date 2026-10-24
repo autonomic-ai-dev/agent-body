@@ -303,7 +303,7 @@ impl McpGateway {
         );
 
         let now_ms = chrono::Utc::now().timestamp_millis();
-        if matches!(tool_name, "muscle_execute_bash" | "muscle_execute_python") {
+        if matches!(tool_name, "muscle_execute_bash") {
             return Ok(CallToolResult::error(vec![Content::text(
                 serde_json::json!({
                     "executed": false,
@@ -538,11 +538,6 @@ struct MuscleExecuteParams {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
-struct MusclePythonParams {
-    code: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 struct EyesDescribeDomParams {
     html: String,
     #[serde(default = "default_max_elements")]
@@ -760,15 +755,6 @@ impl McpGateway {
         }
 
         self.forward_params("muscle", "muscle_execute_bash", params.0)
-            .await
-    }
-
-    #[tool(description = "Run a Python snippet in an isolated interpreter")]
-    async fn muscle_execute_python(
-        &self,
-        params: Parameters<MusclePythonParams>,
-    ) -> Result<CallToolResult, McpError> {
-        self.forward_params("muscle", "muscle_execute_python", params.0)
             .await
     }
 
