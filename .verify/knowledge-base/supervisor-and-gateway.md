@@ -2,43 +2,43 @@
 
 ## What it does
 
-agent-body is the single entry point for the Autonomic stack. It creates the shared workspace, starts and stops the daemons in dependency order, reports their health, can register them as a macOS LaunchAgent, and serves one MCP gateway that proxies every organ's tools.
+agent-body is the single entry point for the Autonomic stack. It creates the workspace, starts and supervises the daemons in dependency order, reports health, installs a macOS LaunchAgent, and serves one MCP gateway that proxies every organ tool. It also defines the shared `ExecuteResult` payload that agent-spine consumes.
 
 ## How it works
 
-1. **Workspace.** `autonomic init` creates `~/.autonomic/` and `config.toml`. Every organ reads config, memory, state, and logs from this one layout.
-2. **Lifecycle.** `autonomic start`, `stop`, and `restart` manage one PID file per daemon under `~/.autonomic/state/supervisor/`. Start order is nats-server, then nerves, then heart.
-3. **Supervision.** `autonomic supervise` polls each daemon's health and restarts one that fails.
-4. **Health mesh.** `GET /organs/health` (`agent-body/agent-body/src/health_mesh.rs`) returns one JSON report covering every organ. `GET /health` returns the gateway's own status.
-5. **Gateway.** `autonomic serve-mcp` serves one MCP endpoint. A call to an organ tool is proxied to `agent-<organ>`. A stopped daemon is spawned on demand. `autonomic <organ> ...` does the same from the CLI.
-6. **Persistence.** `autonomic launchd install` writes `~/Library/LaunchAgents/com.autonomic.daemons.plist`. `status` and `uninstall` manage the same file.
+1. **Workspace.** `autonomic init` creates `~/.autonomic/` and `config.toml`.
+2. **Lifecycle.** `autonomic start`, `stop`, and `restart` start daemons in order (nats-server, nerves, heart) and track each PID under `~/.autonomic/state/supervisor/`.
+3. **Supervision.** `autonomic supervise` polls each daemon and restarts one that fails.
+4. **Health.** `GET /organs/health` (`agent-body/src/health_mesh.rs`) aggregates each organ's health into one JSON summary.
+5. **Gateway.** `autonomic serve-mcp` serves every organ tool through one MCP endpoint. It spawns stopped daemons on demand and proxies `autonomic <organ> …` to `agent-<organ>`.
+6. **Results.** `ExecuteResult` (`core/src/nats.rs`) carries `degraded: bool`, which is `false` when absent from older payloads. Immune sets it when it falls back from Firecracker to a subprocess.
 
 ## Where the code is
 
-- Health mesh: `agent-body/agent-body/src/health_mesh.rs`, route at line 11
-- Supervisor: `agent-body/agent-body/src/supervisor.rs`
-- Routes: the HTTP routes table in `agent-body/README.md`
+- `agent-body/src/`: supervisor, health mesh, and the gateway.
+- `core/src/nats.rs`: shared subjects and payloads, including `ExecuteResult`.
+- Tests: `cargo test --workspace` runs the crate unit tests. The `ExecuteResult` tests are `payload_without_degraded_defaults_to_false` and `degraded_flag_round_trips`.
 
 ## How to use it
 
-- `autonomic init`, then `autonomic start`, then `autonomic status`
-- `autonomic doctor` lists missing binaries with a non-zero exit
-- `autonomic serve-mcp` gives a host agent one endpoint for every organ
-- `curl http://localhost:<port>/organs/health` for the whole stack
+- `autonomic init`, then `autonomic start`.
+- `autonomic status` lists each daemon with its PID and health.
+- `autonomic serve-mcp` for an MCP host.
 
 ## How it is verified
 
-- `cargo test` in agent-body: the supervisor, config, and gateway logic (50 tests in the recorded baseline)
-- `bash .verify/checks/route_drift.sh`: the README route table matches the `.route()` calls in source, in both directions
+- `cargo test --workspace` runs the workspace suite. Last recorded run for `v1.0.0-beta.3.10`: 29 and 23 unit tests passed, with no failures.
+- `cargo clippy --workspace --all-targets -- -D warnings` passed for the same release.
+- The retry and timeout behaviour in the gateway has no test yet.
 
 ## Known limits
 
-- The response shape of `/organs/health` has no test. Check the JSON before depending on exact keys.
-- `retry-and-timeout` (three retries per call) is documented in `AGENTS.md` but no test confirms it.
-- The gateway spawns stopped daemons, so a test that calls a tool can start a real process. Stop only the PIDs the test recorded.
-- `launchd-persistence` writes to the real LaunchAgents folder. Test it only against a temporary home directory.
+- `retry-and-timeout` is documented but not confirmed by a test.
+- The gateway auto-spawns stopped daemons, so a test that calls a tool can start a real process.
+- `launchd-persistence` writes to the user's LaunchAgents folder. Test it only against a temporary home directory.
+- Immune sets `degraded` only after it re-pins to a tag that includes the field. Until then, the flag stays `false` in immune's results.
 
 ## Related
 
-- Feature map: `agent-body/.verify/features/supervisor-and-gateway.md`
-- Organ health is fed by every organ's `/health` route, for example [budget-gate](../../../agent-heart/.verify/knowledge-base/budget-gate.md)
+- Feature map: `.verify/features/supervisor-and-gateway.md`
+- Organ consumers: agent-spine (`ExecuteResult`), agent-immune (sets `degraded`)
