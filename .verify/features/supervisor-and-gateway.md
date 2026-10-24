@@ -30,8 +30,8 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
   - Outcome: A JSON summary per organ. The routes are in the README's HTTP routes table, and `.verify/checks/route_drift.sh` checks them against source. The response shape is not verified by a test in this pass.
 - `mcp-gateway`: Serves all organ tools through one MCP endpoint.
   - Intent: Let a host agent call any organ through one server.
-  - Behaviour: `autonomic serve-mcp` starts the gateway and spawns stopped daemons on demand. `autonomic <organ> …` proxies to `agent-<organ>`.
-  - Outcome: Tool calls reach the organ and return its result.
+  - Behaviour: `autonomic serve-mcp` starts the gateway and spawns stopped daemons on demand. `autonomic <organ> …` proxies to `agent-<organ>`. The startup health check runs on a detached thread (`agent-body/src/mcp_gateway.rs`, `McpGateway::run`), so the gateway can exit while it runs.
+  - Outcome: Tool calls reach the organ and return its result. The gateway exits when its host closes stdin.
 - `retry-and-timeout`: Enforces per-call deadlines and retries failed calls up to three times.
   - Intent: Keep one slow organ from hanging a host session.
   - Behaviour: As stated in `AGENTS.md` section 5 for the gateway.
@@ -79,3 +79,4 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
 - `launchd-persistence` writes to the user's LaunchAgents folder. Test it only against a temporary home directory, never the real one.
 - `retry-and-timeout` is documented in `AGENTS.md` but not confirmed by a test in this pass. Treat it as an open item.
 - The gateway auto-spawns stopped daemons, so a test that calls a tool can start a real process. Stop only the PIDs the test recorded.
+- The gateway's exit when its host closes stdin has no automated test. The startup health check starts organ daemons, so a test that runs `serve-mcp` starts them on the developer's machine. It was checked by hand: `serve-mcp` run under a shell that exits, with stdin closed, exits within about 2 seconds (PR #66). Re-run that check after any change to `McpGateway::run`.
