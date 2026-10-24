@@ -212,6 +212,13 @@ The integration surface between organs is defined by three layers:
 
 ---
 
+## HTTP routes
+
+| Method | Path | Purpose |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Daemon health |
+| `GET` | `/organs/health` | Health of every organ in one report |
+
 ## Development
 
 ```bash
