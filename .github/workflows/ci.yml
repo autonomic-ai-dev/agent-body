@@ -1,7 +1,7 @@
 name: CI
 
-# Only run when paths that affect the binary, tests, or CI itself change.
-# Skipped for docs/**, *.md, .cursor/**, and other non-runtime files.
+# Pushes run only when paths that affect the binary, tests, or CI itself change.
+# Pull requests always report this check; the job skips docs/**, *.md, and .cursor/** changes.
 # Manual runs always allowed via workflow_dispatch.
 on:
   push:
@@ -22,9 +22,6 @@ on:
       - "!docs/**"
   pull_request:
     branches: [master]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
   workflow_dispatch:
 
 permissions:
