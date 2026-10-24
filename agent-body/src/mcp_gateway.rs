@@ -164,7 +164,7 @@ impl Default for McpGateway {
 
 impl McpGateway {
     pub async fn run() -> anyhow::Result<()> {
-        tokio::task::spawn_blocking(|| {
+        std::thread::spawn(|| {
             let _ = crate::supervisor::ensure_running_quiet();
         });
 
