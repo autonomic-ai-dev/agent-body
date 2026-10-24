@@ -6,7 +6,7 @@ Summary: One bash AST guard decides which shell commands are rejected before any
 
 - `guard-inspect`: Rejects destructive or dynamic shell commands.
   - Intent: One policy that every organ applies.
-  - Behaviour: `inspect(source)` in `core/src/guard.rs` parses the command with tree-sitter bash. It rejects recursive `rm`, `find -delete`, `eval`/`source`/`.`, dynamic command names, raw device writes, `mkfs`/`newfs`, `diskutil` erase commands, pipe-to-shell from a fetcher, fork bombs, and any syntax error or parse failure.
+  - Behaviour: `inspect(source)` in `core/src/guard.rs` parses the command with tree-sitter bash. It rejects recursive `rm`, `find -delete`, `eval`/`source`/`.`, inline interpreter code (the -c and -e flags of python, node, perl, and similar), dynamic command names, raw device writes, `mkfs`/`newfs`, `diskutil` erase commands, pipe-to-shell from a fetcher, fork bombs, and any syntax error or parse failure.
   - Outcome: An empty result means allowed. Each rejection returns a line and a message.
 - `parity-corpus`: A shared list of allowed and rejected commands.
   - Intent: Let every organ prove it agrees with the shared policy.

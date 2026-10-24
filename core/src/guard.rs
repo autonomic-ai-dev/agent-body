@@ -21,6 +21,9 @@ const WRAPPERS: &[&str] = &[
 const SHELLS: &[&str] = &["sh", "bash", "zsh", "dash", "ksh"];
 const FETCHERS: &[&str] = &["curl", "wget"];
 const DYNAMIC: &[&str] = &["eval", "source", "."];
+const INTERPRETERS: &[&str] = &[
+    "python", "node", "deno", "bun", "perl", "ruby", "php", "lua",
+];
 const RAW_DEVICE_PREFIXES: &[&str] = &[
     "/dev/sd",
     "/dev/nvme",
@@ -136,6 +139,10 @@ fn check_command(words: &[&str], line: usize, issues: &mut Vec<GuardIssue>) {
             line,
             format!("dynamic execution (eval/source/.) blocked: `{name}`"),
         )),
+        name if is_inline_interpreter(name, words) => issues.push(issue(
+            line,
+            format!("inline interpreter code blocked: `{name}`; run the code from a file"),
+        )),
         shell if SHELLS.contains(&shell) => {
             if let Some(pos) = words.iter().position(|word| plain(word) == "-c") {
                 check_nested(&words[pos + 1..].join(" "), line, issues);
@@ -217,11 +224,24 @@ fn check_pipeline(text: &str, line: usize, issues: &mut Vec<GuardIssue>) {
     }
 }
 
+fn is_inline_interpreter(name: &str, words: &[&str]) -> bool {
+    INTERPRETERS
+        .iter()
+        .any(|interpreter| name.starts_with(interpreter))
+        && words
+            .iter()
+            .skip(1)
+            .any(|word| matches!(plain(word).as_str(), "-c" | "-e" | "-E" | "--eval"))
+}
+
 fn is_dangerous_name(name: &str) -> bool {
     WRAPPERS.contains(&name)
         || SHELLS.contains(&name)
         || DYNAMIC.contains(&name)
         || matches!(name, "rm" | "dd" | "diskutil")
+        || INTERPRETERS
+            .iter()
+            .any(|interpreter| name.starts_with(interpreter))
         || name.starts_with("mkfs")
         || name.starts_with("newfs")
 }
