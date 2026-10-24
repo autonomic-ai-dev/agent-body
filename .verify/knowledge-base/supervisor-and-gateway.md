@@ -10,7 +10,7 @@ agent-body is the single entry point for the Autonomic stack. It creates the wor
 2. **Lifecycle.** `autonomic start`, `stop`, and `restart` start daemons in order (nats-server, nerves, heart) and track each PID under `~/.autonomic/state/supervisor/`.
 3. **Supervision.** `autonomic supervise` polls each daemon and restarts one that fails.
 4. **Health.** `GET /organs/health` (`agent-body/src/health_mesh.rs`) aggregates each organ's health into one JSON summary.
-5. **Gateway.** `autonomic serve-mcp` serves every organ tool through one MCP endpoint. It spawns stopped daemons on demand and proxies `autonomic <organ> …` to `agent-<organ>`.
+5. **Gateway.** `autonomic serve-mcp` serves every organ tool through one MCP endpoint. It spawns stopped daemons on demand and proxies `autonomic <organ> …` to `agent-<organ>`. It exits when its host closes stdin. The startup health check runs on a detached thread, so shutdown does not wait for it (PR #66). Before PR #66, shutdown waited on that check, and a gateway whose host had exited kept running.
 6. **Results.** `ExecuteResult` (`core/src/nats.rs`) carries `degraded: bool`, which is `false` when absent from older payloads. Immune sets it when it falls back from Firecracker to a subprocess.
 
 ## Where the code is
