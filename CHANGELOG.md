@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.0-beta.3.11] - 2026-10-24
+
+### Changed
+- `agent-body-core::guard` has one strict policy. The Execution and Approval modes are merged, so recursive `rm`, `find -delete`, and `eval`/`source`/`.` are rejected for every organ.
+- `agent-body-core::guard_corpus::COMMAND_POLICY_CORPUS` is a parity corpus that each organ runs against its own wrapper.
+
 ## [1.0.0-beta.3.10] - 2026-10-24
 
 ### Added
