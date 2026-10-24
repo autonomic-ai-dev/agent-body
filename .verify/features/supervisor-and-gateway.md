@@ -27,7 +27,7 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
 - `organ-health-mesh`: Reports health of every organ from one endpoint.
   - Intent: Let an operator or a dashboard see the whole stack without querying each organ.
   - Behaviour: `GET /organs/health` (`agent-body/agent-body/src/health_mesh.rs` line 11) aggregates organ health.
-  - Outcome: A JSON summary per organ. The response shape is not verified by a test in this pass.
+  - Outcome: A JSON summary per organ. The routes are in the README's HTTP routes table, and `.verify/checks/route_drift.sh` checks them against source. The response shape is not verified by a test in this pass.
 - `mcp-gateway`: Serves all organ tools through one MCP endpoint.
   - Intent: Let a host agent call any organ through one server.
   - Behaviour: `autonomic serve-mcp` starts the gateway and spawns stopped daemons on demand. `autonomic <organ> …` proxies to `agent-<organ>`.
@@ -58,6 +58,11 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
    - Why: Proves the crate's supervisor, config, and gateway logic.
    - Expected: 50 passed, 0 failed (baseline, `.verify/artifacts/feature-map-baseline/cargo-test.log`).
    - Impact: A failure means lifecycle or routing changed. Fix the cause.
+2. **route-drift** (sub-features: organ-health-mesh)
+   - Request: `bash .verify/checks/route_drift.sh`
+   - Why: Proves each README route row matches a `.route()` in source, and each source route has a README row.
+   - Expected: `route drift: README routes and src routes agree`.
+   - Impact: A failure means a route was added, renamed, or removed without its README row. Fix whichever side is wrong.
 
 ## Gotchas
 
