@@ -20,7 +20,7 @@ Summary: One bash AST guard decides which shell commands are rejected before any
 
 ## How to get to it (user POV)
 
-- This crate exposes `agent_body_core::guard::inspect`. Mouth, muscle, and immune call it through their own wrappers once they re-pin to a release that includes this module. Those changes are separate PRs.
+- This crate exposes `agent_body_core::guard::inspect`. Mouth, muscle, and immune call it at v1.0.0-beta.3.11.
 
 ## Verification Suites (Targeted Test Commands)
 
@@ -29,4 +29,4 @@ Summary: One bash AST guard decides which shell commands are rejected before any
 ## Gotchas
 
 - The policy is stricter than before for agent-muscle. `rm -rf target/` and `find ... -delete` are now rejected everywhere, not only under protected roots. Clean build directories with a non-recursive command or a tool-specific clean.
-- Mouth and muscle have no change in this PR. They still run their own copies until they re-pin to the release that includes this code.
+- Mouth, muscle, and immune call this guard at v1.0.0-beta.3.11. Each organ's wrapper runs `COMMAND_POLICY_CORPUS` in its own tests.
