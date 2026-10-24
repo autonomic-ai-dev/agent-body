@@ -37,6 +37,11 @@ Summary: agent-body is the single entry point for the Autonomic stack. It create
   - Behaviour: As stated in `AGENTS.md` section 5 for the gateway.
   - Outcome: Retries and the final error are returned to the caller. Not yet verified by a test in this pass.
 
+## Code
+
+- `agent-body`
+- `core`
+
 ## How to get to it (user POV)
 
 - CLI: `autonomic init`, `autonomic start`, `autonomic status`, `autonomic doctor`, `autonomic serve-mcp`, `autonomic tui`
